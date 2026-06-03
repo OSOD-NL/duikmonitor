@@ -1,0 +1,35 @@
+# Installeren: pip install pre-commit  &&  pre-commit install
+# Daarna draait dit automatisch bij elke commit, lokaal op je eigen computer.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: local
+    hooks:
+      - id: duikmonitor-js-syntax
+        name: Duikmonitor JavaScript-syntax
+        entry: bash -c 'awk '\''f{ if($0 ~ /<\/script>/){exit} print } /<script>/{f=1}'\'' index.html > /tmp/duikmonitor-app.js && node --check /tmp/duikmonitor-app.js'
+        language: system
+        pass_filenames: false
+      - id: duikmonitor-selftests
+        name: Duikmonitor zelftests
+        entry: node scripts/run-selftests-node.js
+        language: system
+        pass_filenames: false
+      - id: duikmonitor-theme-colors
+        name: Duikmonitor themakleuren-lint
+        entry: node scripts/check-theme-colors.js
+        language: system
+        pass_filenames: false
+      - id: duikmonitor-checksum
+        name: Duikmonitor release-checksum
+        entry: sha256sum -c CHECKSUMS.sha256
+        language: system
+        pass_filenames: false

@@ -1,0 +1,27 @@
+name: Probleem melden
+description: Meld een fout of iets dat niet klopt
+title: "[Probleem] "
+labels: ["probleem"]
+body:
+  - type: markdown
+    attributes:
+      value: "Zet **geen** echte namen, contactgegevens, locaties of operationele persoonsgegevens in dit formulier; gebruik voorbeelden als 'Duiker 1'."
+  - type: textarea
+    id: wat
+    attributes:
+      label: Wat gebeurde er?
+    validations:
+      required: true
+  - type: textarea
+    id: verwacht
+    attributes:
+      label: Wat verwachtte je?
+    validations:
+      required: true
+  - type: input
+    id: omgeving
+    attributes:
+      label: Apparaat en browser
+      placeholder: "bijv. iPhone, Safari"
+    validations:
+      required: false

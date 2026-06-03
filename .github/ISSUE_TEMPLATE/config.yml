@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Duikmonitor openen
+    url: https://duikmonitor.app/
+    about: Open de publieke Duikmonitor.
+  - name: Broncode bekijken
+    url: https://github.com/streuper/duikmonitor
+    about: Bekijk broncode, documentatie en changelog.
+  - name: Beveiligingsprobleem melden
+    url: https://github.com/streuper/duikmonitor/security
+    about: Meld beveiligingsproblemen niet openbaar in Issues.

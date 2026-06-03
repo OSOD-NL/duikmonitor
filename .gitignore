@@ -1,0 +1,18 @@
+# Lokale blokkeerlijst met namen: NOOIT committen
+namen.local.txt
+blocklist.local*
+
+# Besturingssysteem
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Lokale werkpakketten en bronmateriaal niet committen
+DCIEM_COMPLEET.zip
+DCIEM_COMPLEET/
+*.local.zip

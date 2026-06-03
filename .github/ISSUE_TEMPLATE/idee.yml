@@ -1,0 +1,22 @@
+name: Idee of verbetering
+description: Stel een verbetering of nieuwe functie voor
+title: "[Idee] "
+labels: ["idee"]
+body:
+  - type: markdown
+    attributes:
+      value: "Bedankt voor het meedenken. Zet **geen** echte namen, contactgegevens, locaties of operationele persoonsgegevens in dit formulier."
+  - type: textarea
+    id: voorstel
+    attributes:
+      label: Wat stel je voor?
+      description: Beschrijf kort het idee en waarom het handig is.
+    validations:
+      required: true
+  - type: textarea
+    id: situatie
+    attributes:
+      label: In welke situatie helpt dit?
+      description: Bijvoorbeeld bij het registreren, printen of plannen.
+    validations:
+      required: false
