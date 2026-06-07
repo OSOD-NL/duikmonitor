@@ -531,7 +531,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.0.0";
+  const APP_VERSION = "v1.1.0";
   const PUBLIC_APP_URL = "https://duikmonitor.app/";
   const REPO_URL = "https://github.com/streuper/duikmonitor";
   const ISSUE_URL = "https://github.com/streuper/duikmonitor/issues/new/choose";
@@ -911,14 +911,36 @@
     return SAFE_ID_RE.test(id) ? id : uid();
   }
 
+  const MAX_BAR = 330;
+  const MAX_MDD = 15;
+  const MAX_LOCATION_CHARS = 25;
+  const MAX_POST_CHARS = 25;
+  const MAX_DPL_CHARS = 8;
+  const MAX_DIVER_LABEL_CHARS = 8;
+  const MAX_SIGNAL_HOLDER_CHARS = 8;
   const cleanText = (value, max) => String(value ?? "").replace(/[\u0000-\u001F\u007F]+/g," ").replace(/\s+/g," ").trim().slice(0,max);
   const cleanLabel = value => cleanText(value,80);
+  const cleanDiverLabel = value => cleanText(value,MAX_DIVER_LABEL_CHARS);
   const cleanNote = value => String(value ?? "").slice(0,2000);
   const cleanCode = value => String(value ?? "").trim().slice(0,8);
+  const cleanSignalHolder = value => cleanText(value,MAX_SIGNAL_HOLDER_CHARS);
   const cleanRole = value => cleanText(value,40);
-  const cleanProjectText = value => cleanText(value,80);
-  const cleanLocation = value => cleanText(value,120);
+  const cleanProjectText = value => cleanText(value,MAX_POST_CHARS);
+  const cleanDpl = value => cleanText(value,MAX_DPL_CHARS);
+  const cleanLocation = value => cleanText(value,MAX_LOCATION_CHARS);
   const cleanMaterial = value => String(value ?? "").replace(/\D/g,"").slice(0,2);
+  const cleanMddValue = (value, {clamp=false, fallback=""}={}) => {
+    const n = parseNum(value);
+    if(!Number.isFinite(n) || n <= 0) return fallback;
+    if(n > MAX_MDD) return clamp ? MAX_MDD : fallback;
+    return Math.round(n*10)/10;
+  };
+  const cleanAirDepthValue = (value, {clamp=false}={}) => {
+    const n = parseNum(value);
+    if(!Number.isFinite(n) || n < 0) return "";
+    if(n > MAX_MDD) return clamp ? MAX_MDD : "";
+    return Math.round(n*10)/10;
+  };
   const matNo = code => (String(code).match(/\d+/) || ["0"])[0].slice(-2).padStart(2,"0");
   const DIVER_SLOT_COUNT = 12;
   const defaultDiverCode = i => "D" + (i + 1);
@@ -941,7 +963,7 @@
   const displayDiver = diver => {
     const d = typeof diver === "string" ? getDiver(diver) : diver;
     const code = diverCode(d);
-    const label = cleanLabel(d?.label || "");
+    const label = cleanDiverLabel(d?.label || "");
     return label ? `${code} · ${label}` : code;
   };
   const isDiverActive = diver => diver && diver.active !== false;
@@ -1107,7 +1129,7 @@
     state.project.date = /^\d{4}-\d{2}-\d{2}$/.test(String(state.project.date || "")) ? String(state.project.date) : localDate();
     state.project.location = cleanLocation(state.project.location || "");
     state.project.post = cleanProjectText(state.project.post || "");
-    state.project.dpl = cleanProjectText(state.project.dpl || "");
+    state.project.dpl = cleanDpl(state.project.dpl || "");
     state.project.dayNote = cleanNote(state.project.dayNote || "");
     if(typeof state.project.scope !== "string") state.project.scope = cleanCode(state.project.scope || "");
     state.project.scope = cleanCode(state.project.scope || "");
@@ -1169,8 +1191,8 @@
       role:String(p?.role || "RD"),
       start:p?.start || "",
       end:p?.end || p?.surface || "",
-      startBar:p?.startBar ?? p?.barStart ?? "",
-      endBar:p?.endBar ?? p?.barEnd ?? "",
+      startBar:cleanBarValue(p?.startBar ?? p?.barStart ?? ""),
+      endBar:cleanBarValue(p?.endBar ?? p?.barEnd ?? ""),
       notes:String(p?.notes || "")
     }));
     return d.phases;
@@ -1198,7 +1220,7 @@
     const phases = ensurePhases(d);
     if(!phases.length) return "";
     return phases.map(p=>{
-      const t = `${timePart(p.start)||"—"}-${timePart(p.end)||"—"}`;
+      const t = `${fmtClockMinute(parseDT(p.start))}-${fmtClockMinute(parseDT(p.end))}`;
       const bars = `${p.startBar || "—"}->${p.endBar || "—"} bar`;
       return `${roleLabel(p.role)} ${t} (${bars})${p.notes ? " " + p.notes : ""}`;
     }).join("; " );
@@ -1210,12 +1232,19 @@
     d.airMeasurements = d.airMeasurements
       .filter(m => m && (m.time || m.timeTs || m.bar !== undefined))
       .map(m => {
+        const bar = cleanBarValue(m.bar);
+        if(bar === "") return null;
         const ts = dateFromTs(m.timeTs);
         const fallback = m.time || nowLocal();
         const dt = ts || parseDT(fallback) || new Date();
-        return {time:toLocalDTString(dt), timeTs:dt.getTime(), bar:m.bar ?? "", depth:m.depth ?? m.mdd ?? ""};
-      });
-    if(d.airStartBar === undefined) d.airStartBar = "";
+        const item = {time:toLocalDTString(dt), timeTs:dt.getTime(), bar};
+        const depth = cleanAirDepthValue(m.depth ?? m.mdd);
+        if(depth !== "") item.depth = depth;
+        return item;
+      })
+      .filter(Boolean);
+    d.airStartBar = cleanBarValue(d.airStartBar);
+    d.airEndBar = cleanBarValue(d.airEndBar);
     if(d.airCylinderLiters === undefined) d.airCylinderLiters = AIR_CYLINDER_LITERS;
     if(d.airStopBar === undefined) d.airStopBar = AIR_STOP_BAR;
     if(d.airCheckIntervalMin === undefined) d.airCheckIntervalMin = airCheckIntervalForDepth(d.mdd);
@@ -1239,6 +1268,13 @@
         d.registrationType = normalizeRegistrationType(d.registrationType);
         d.dtMode = normalizeDtMode(d.dtMode || (d.dtUsedMin ? "manual" : "auto"));
         if(d.dtManualMin != null && d.dtUsedMin == null) d.dtUsedMin = d.dtManualMin;
+        d.mdd = cleanMddValue(d.mdd, {fallback:""});
+        d.signalHolder = cleanSignalHolder(d.signalHolder);
+        d.role = cleanRole(d.role);
+        d.setNo = cleanMaterial(d.setNo);
+        d.maskNo = cleanMaterial(d.maskNo);
+        d.airStartBar = cleanBarValue(d.airStartBar);
+        d.airEndBar = cleanBarValue(d.airEndBar);
         ensurePhases(d);
         if(listName === "live"){ ensureAirFields(d); syncLiveTimeFields(d); }
       });
@@ -1316,6 +1352,7 @@
   function parseDT(v){ if(!v) return null; const d = new Date(v); return isNaN(d.getTime()) ? null : d; }
   function toInputDT(d){ if(!d) return ""; return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,19); }
   function fmtTime(d, seconds=true){ if(!d) return "—"; return d.toLocaleTimeString("nl-NL", {hour:"2-digit", minute:"2-digit", second:seconds?"2-digit":undefined}); }
+  function fmtClockMinute(d){ return fmtTime(d, false); }
   function fmtDate(d){ if(!d) return "—"; return d.toLocaleDateString("nl-NL"); }
   function fmtMin(m){ return Number.isFinite(m) ? String(Math.round(m)) : "—"; }
   function fmtHF(hf){ return Number.isFinite(hf) ? hf.toFixed(1).replace('.', ',') : "—"; }
@@ -2042,9 +2079,9 @@
       <h2>Daggegevens</h2>
       <div class="fieldrow">
         <div class="f3"><label>Datum</label><input aria-label="Datum" class="user" type="date" value="${esc(state.project.date)}" data-project="date"></div>
-        <div class="f4"><label>Locatie</label><input aria-label="Locatie" class="user${requiredClass(state.project.location)}" maxlength="120" value="${esc(state.project.location)}" data-project="location" data-required-project></div>
-        <div class="f3"><label>Post/Ploeg</label><input aria-label="Post/Ploeg" class="user${requiredClass(state.project.post)}" maxlength="80" value="${esc(state.project.post||'')}" data-project="post" data-required-project></div>
-        <div class="f2"><label>DPL</label><input aria-label="DPL" class="user${requiredClass(state.project.dpl)}" maxlength="80" value="${esc(state.project.dpl)}" data-project="dpl" data-required-project></div>
+        <div class="f4"><label>Locatie</label><input aria-label="Locatie" class="user${requiredClass(state.project.location)}" maxlength="25" value="${esc(state.project.location)}" data-project="location" data-required-project></div>
+        <div class="f3"><label>Post/Ploeg</label><input aria-label="Post/Ploeg" class="user${requiredClass(state.project.post)}" maxlength="25" value="${esc(state.project.post||'')}" data-project="post" data-required-project></div>
+        <div class="f2"><label>DPL</label><input aria-label="DPL" class="user${requiredClass(state.project.dpl)}" maxlength="8" value="${esc(state.project.dpl)}" data-project="dpl" data-required-project></div>
       </div>
       <details class="fold"${open1}><summary>Oefencodes dagdeel 1</summary><div class="fold-body"><div class="fieldrow"><div class="f4">${codeSelect('1',0)}</div><div class="f4">${codeSelect('1',1)}</div><div class="f4">${codeSelect('1',2)}</div></div></div></details>
       <details class="fold"${open2}><summary>Oefencodes dagdeel 2</summary><div class="fold-body"><div class="fieldrow"><div class="f4">${codeSelect('2',0)}</div><div class="f4">${codeSelect('2',1)}</div><div class="f4">${codeSelect('2',2)}</div></div></div></details>
@@ -2077,9 +2114,12 @@
         } else if(inp.dataset.project === "location"){
           state.project.location = cleanLocation(inp.value);
           inp.value = state.project.location;
-        } else if(inp.dataset.project === "post" || inp.dataset.project === "dpl"){
-          state.project[inp.dataset.project] = cleanProjectText(inp.value);
-          inp.value = state.project[inp.dataset.project];
+        } else if(inp.dataset.project === "post"){
+          state.project.post = cleanProjectText(inp.value);
+          inp.value = state.project.post;
+        } else if(inp.dataset.project === "dpl"){
+          state.project.dpl = cleanDpl(inp.value);
+          inp.value = state.project.dpl;
         } else {
           state.project[inp.dataset.project]=inp.value;
         }
@@ -2129,12 +2169,12 @@
   function newPlanDive(){
     const diverId = firstActiveDiverId();
     const div = getDiver(diverId);
-    return {id:uid(), diverId, start: projectNowLocal(), dtMin:10, mdd:parseNum(div.defaultMdd)||6, rule:"auto", daypart:"1", notes:""};
+    return {id:uid(), diverId, start: projectNowLocal(), dtMin:10, mdd:cleanMddValue(div.defaultMdd,{clamp:true,fallback:6}), rule:"auto", daypart:"1", notes:""};
   }
   function renderDiveEditor(dataset, dives, calc){
     const list = dives.map((d,i)=>renderDiveCard(dataset,d,i,calc.byEvent.get(d.id))).join("") || `<div class="hint">Nog geen duiken ingevoerd. Gebruik <b>+ Duikregel</b>.</div>`;
     return `<div class="mobile-list">${list}</div><div class="tablewrap desktop"><table class="table"><thead><tr>
-      <th>#</th><th>Duiker</th><th>Dagdeel</th><th>Rekenwijze</th>${dataset==='live'?'<th>SH</th><th>Registratie</th>':''}<th>Start</th><th>${dataset==='planning'?'DT plan':'Opkomst'}</th><th>${dataset==='planning'?'MDD':'Boven'}</th>${dataset==='live'?'<th>DT</th><th>Materiaal</th>':''}<th>Status</th><th>DCIEM</th><th>Opkomst</th><th>Actie</th>
+      <th>#</th><th>Duiker</th><th>Dagdeel</th><th>Rekenwijze</th>${dataset==='live'?'<th>Seinhouder</th><th>Registratie</th>':''}<th>Start</th><th>${dataset==='planning'?'DT plan':'Opkomst'}</th><th>${dataset==='planning'?'MDD':'Boven'}</th>${dataset==='live'?'<th>DT</th><th>Materiaal</th>':''}<th>Status</th><th>DCIEM</th><th>Opkomst</th><th>Actie</th>
     </tr></thead><tbody>${dives.map((d,i)=>renderDiveRow(dataset,d,i,calc.byEvent.get(d.id))).join("")}</tbody></table></div>`;
   }
   function diverOptions(selected){
@@ -2204,7 +2244,7 @@
       <td><select aria-label="Duiker" class="user" data-dive-field="diverId" data-dataset="${dataset}" data-id="${esc(d.id)}">${diverOptions(d.diverId)}</select></td>
       <td><select aria-label="Dagdeel" class="user" data-dive-field="daypart" data-dataset="${dataset}" data-id="${esc(d.id)}">${daypartOptions(d.daypart)}</select></td>
       <td><select aria-label="Rekenwijze" class="user" data-dive-field="rule" data-dataset="${dataset}" data-id="${esc(d.id)}">${ruleOptions(d.rule||'auto')}</select></td>
-      ${dataset==='live'?`<td><input aria-label="SH / Seinhouder" class="user" data-dive-field="signalHolder" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.signalHolder||'')}" placeholder="SH-code"></td><td><select aria-label="Invoer" class="user" data-dive-field="entryMode" data-dataset="${dataset}" data-id="${esc(d.id)}">${entryModeOptions(d.entryMode)}</select><select aria-label="Registratievorm" class="user" data-dive-field="registrationType" data-dataset="${dataset}" data-id="${esc(d.id)}" style="margin-top:4px">${registrationTypeOptions(d.registrationType)}</select></td>`:''}
+      ${dataset==='live'?`<td><input aria-label="Seinhouder" maxlength="8" class="user" data-dive-field="signalHolder" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.signalHolder||'')}" placeholder="SH-code"></td><td><select aria-label="Invoer" class="user" data-dive-field="entryMode" data-dataset="${dataset}" data-id="${esc(d.id)}">${entryModeOptions(d.entryMode)}</select><select aria-label="Registratievorm" class="user" data-dive-field="registrationType" data-dataset="${dataset}" data-id="${esc(d.id)}" style="margin-top:4px">${registrationTypeOptions(d.registrationType)}</select></td>`:''}
       <td>${timeInput('start', d.start)}</td>
       <td>${dataset==='planning'?`<input aria-label="Geplande DT (min)" class="user" type="number" step="1" min="0" data-dive-field="dtMin" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.dtMin||"")}">`:timeInput('ascentStart', d.ascentStart)}</td>
       <td>${dataset==='planning'?`<input aria-label="MDD" class="user" type="text" inputmode="decimal" data-dive-field="mdd" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.mdd||"")}">`:`${timeInput('surface', d.surface)}<input aria-label="MDD" class="user" type="text" inputmode="decimal" data-dive-field="mdd" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.mdd||"")}" title="MDD">`}</td>
@@ -2219,7 +2259,7 @@
     if(dataset !== "live") return "";
     const phases = ensurePhases(d);
     const pstats = phaseStats(d);
-    const rows = phases.map((p,i)=>`<div class="divecard phase-card"><div class="fieldrow"><div class="f2"><label>Rol</label><select aria-label="Rol" class="user" data-phase-field="role" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}">${roleOptions(p.role)}</select></div><div class="f2"><label>Van</label><input aria-label="Van" class="user" type="time" step="1" data-phase-field="start" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(timePart(p.start))}"></div><div class="f2"><label>Tot</label><input aria-label="Tot" class="user" type="time" step="1" data-phase-field="end" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(timePart(p.end))}"></div><div class="f2"><label>Druk van</label><input aria-label="Druk van" class="user" type="number" inputmode="numeric" step="1" data-phase-field="startBar" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(p.startBar||'')}" placeholder="bar"></div><div class="f2"><label>Druk tot</label><input aria-label="Druk tot" class="user" type="number" inputmode="numeric" step="1" data-phase-field="endBar" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(p.endBar||'')}" placeholder="bar"></div><div class="f2"><label>&nbsp;</label><button class="mini bad" data-delete-phase data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}">Wis fase</button></div><div class="f12"><label>Opmerking fase</label><input aria-label="Opmerking fase" class="user" data-phase-field="notes" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(p.notes||'')}" placeholder="optioneel"></div></div></div>`).join("");
+    const rows = phases.map((p,i)=>`<div class="divecard phase-card"><div class="fieldrow"><div class="f2"><label>Rol</label><select aria-label="Rol" class="user" data-phase-field="role" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}">${roleOptions(p.role)}</select></div><div class="f2"><label>Van</label><input aria-label="Van" class="user" type="time" step="1" data-phase-field="start" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(timePart(p.start))}"></div><div class="f2"><label>Tot</label><input aria-label="Tot" class="user" type="time" step="1" data-phase-field="end" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(timePart(p.end))}"></div><div class="f2"><label>Druk van</label><input aria-label="Druk van" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-phase-field="startBar" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(p.startBar||'')}" placeholder="bar"></div><div class="f2"><label>Druk tot</label><input aria-label="Druk tot" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-phase-field="endBar" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(p.endBar||'')}" placeholder="bar"></div><div class="f2"><label>&nbsp;</label><button class="mini bad" data-delete-phase data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}">Wis fase</button></div><div class="f12"><label>Opmerking fase</label><input aria-label="Opmerking fase" class="user" data-phase-field="notes" data-dataset="${dataset}" data-id="${esc(d.id)}" data-phase-index="${i}" value="${esc(p.notes||'')}" placeholder="optioneel"></div></div></div>`).join("");
     return `<details class="airdetails" open><summary>Fasen / rolmomenten (${phases.length}) · som fasen ${fmtMin(pstats.totalMin)} min</summary>${rows || '<div class="hint">Nog geen fasen. Gebruik + Fase voor RD/ResD-momenten, drukverloop of achteraf overnemen uit formulier.</div>'}<div class="btnrow no-print"><button class="mini primary" data-add-phase data-dataset="${dataset}" data-id="${esc(d.id)}">+ Fase / rolmoment</button></div></details>`;
   }
 
@@ -2231,7 +2271,7 @@
         <div class="f3"><label>Duiker</label><select aria-label="Duiker" class="user" data-dive-field="diverId" data-dataset="${dataset}" data-id="${esc(d.id)}">${diverOptions(d.diverId)}</select></div>
         <div class="f3"><label>Dagdeel</label><select aria-label="Dagdeel" class="user" data-dive-field="daypart" data-dataset="${dataset}" data-id="${esc(d.id)}">${daypartOptions(d.daypart)}</select></div>
         <div class="f3"><label>Rekenwijze</label><select aria-label="Rekenwijze" class="user" data-dive-field="rule" data-dataset="${dataset}" data-id="${esc(d.id)}">${ruleOptions(d.rule||'auto')}</select></div>
-        ${dataset==='live'?`<div class="f3"><label>SH / Seinhouder</label><input aria-label="SH / Seinhouder" class="user" data-dive-field="signalHolder" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.signalHolder||'')}" placeholder="bijv. SH01"></div><div class="f3"><label>Invoer</label><select aria-label="Invoer" class="user" data-dive-field="entryMode" data-dataset="${dataset}" data-id="${esc(d.id)}">${entryModeOptions(d.entryMode)}</select></div><div class="f3"><label>Registratievorm</label><select aria-label="Registratievorm" class="user" data-dive-field="registrationType" data-dataset="${dataset}" data-id="${esc(d.id)}">${registrationTypeOptions(d.registrationType)}</select></div><div class="f3"><label>DT-bron</label><select aria-label="DT-bron" class="user" data-dive-field="dtMode" data-dataset="${dataset}" data-id="${esc(d.id)}">${dtModeOptions(d.dtMode)}</select></div>`:''}
+        ${dataset==='live'?`<div class="f3"><label>Seinhouder</label><input aria-label="Seinhouder" maxlength="8" class="user" data-dive-field="signalHolder" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.signalHolder||'')}" placeholder="bijv. SH01"></div><div class="f3"><label>Invoer</label><select aria-label="Invoer" class="user" data-dive-field="entryMode" data-dataset="${dataset}" data-id="${esc(d.id)}">${entryModeOptions(d.entryMode)}</select></div><div class="f3"><label>Registratievorm</label><select aria-label="Registratievorm" class="user" data-dive-field="registrationType" data-dataset="${dataset}" data-id="${esc(d.id)}">${registrationTypeOptions(d.registrationType)}</select></div><div class="f3"><label>DT-bron</label><select aria-label="DT-bron" class="user" data-dive-field="dtMode" data-dataset="${dataset}" data-id="${esc(d.id)}">${dtModeOptions(d.dtMode)}</select></div>`:''}
         <div class="f3"><label>MDD</label><input aria-label="MDD" class="user" type="text" inputmode="decimal" data-dive-field="mdd" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.mdd||"")}"></div>
         ${timeInput('Tijd in', 'start', d.start)}
         ${dataset==='planning' ? `<div class="f6"><label>Geplande DT (min)</label><input aria-label="Geplande DT (min)" class="user" type="number" step="1" min="0" data-dive-field="dtMin" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.dtMin||"")}"></div>` : `${timeInput('Opkomst', 'ascentStart', d.ascentStart)}${timeInput('Boven', 'surface', d.surface)}<div class="f6"><label>DT (min)</label><input aria-label="DT (min)" class="user" type="number" step="1" min="0" data-dive-field="dtUsedMin" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.dtUsedMin||'')}" placeholder="leeg = volgens DT-bron"></div>`}
@@ -2254,8 +2294,16 @@
           if(dataset === "live" && normalizeEntryMode(d.entryMode) === "live") syncTsFromText(d, field);
           else delete d[tsFieldName(field)];
         }
-        else if(field === "mdd"){ d[field] = inp.value; if(dataset === "live") updateAirCheckInterval(d); }
+        else if(field === "mdd"){
+          const raw = parseNum(inp.value);
+          const v = cleanMddValue(inp.value, {clamp:true, fallback:""});
+          if(Number.isFinite(raw) && raw > MAX_MDD) alert("Maximale duikdiepte is 15 m. De waarde is teruggezet naar 15.");
+          d[field] = v;
+          inp.value = v;
+          if(dataset === "live") updateAirCheckInterval(d);
+        }
         else if(["setNo","maskNo"].includes(field)) d[field] = cleanMaterial(inp.value);
+        else if(field === "signalHolder") d[field] = cleanSignalHolder(inp.value);
         else if(field === "entryMode") d[field] = normalizeEntryMode(inp.value);
         else if(field === "registrationType") d[field] = normalizeRegistrationType(inp.value);
         else if(field === "dtMode") d[field] = normalizeDtMode(inp.value);
@@ -2280,7 +2328,7 @@
       const d = getDataset(dataset).find(x=>x.id===inp.dataset.id); const i = Number(inp.dataset.phaseIndex); if(!d) return; const phases = ensurePhases(d); const p = phases[i]; if(!p) return;
       const field = inp.dataset.phaseField;
       if(["start","end"].includes(field)) p[field] = timeToDateTime(inp.value, p[field]);
-      else if(["startBar","endBar"].includes(field)) p[field] = inp.value;
+      else if(["startBar","endBar"].includes(field)) p[field] = cleanBarValue(inp.value);
       else p[field] = inp.value;
     }));
   }
@@ -2299,7 +2347,7 @@
   function newLiveDive(diverId, airStartBar){
     const div=state.divers.find(d=>d.id===diverId);
     const bar = validBar(airStartBar);
-    const mdd = parseNum(div?.defaultMdd) || 6;
+    const mdd = cleanMddValue(div?.defaultMdd, {clamp:true, fallback:6});
     const d = ensureAirFields({id:uid(), diverId, entryMode:"live", registrationType:"normal", dtMode:"auto", dtUsedMin:"", phases:[], start:"", ascentStart:"", surface:"", mdd, rule:"auto", daypart:"1", notes:"", signalHolder:"", airStartBar:bar == null ? "" : Math.round(bar), setNo:div?.setNo || "", maskNo:div?.maskNo || "", airCheckIntervalMin:airCheckIntervalForDepth(mdd)});
     stampField(d, "start", new Date());
     return d;
@@ -2307,7 +2355,7 @@
   function newBlankLiveDive(){
     const diverId = firstActiveDiverId();
     const div = getDiver(diverId);
-    return ensureAirFields({id:uid(), diverId, entryMode:"achteraf", registrationType:"normal", dtMode:"auto", dtUsedMin:"", phases:[], start:"", ascentStart:"", surface:"", mdd:parseNum(div.defaultMdd)||6, rule:"auto", daypart:"1", notes:"", signalHolder:"", setNo:div.setNo||"", maskNo:div.maskNo||""});
+    return ensureAirFields({id:uid(), diverId, entryMode:"achteraf", registrationType:"normal", dtMode:"auto", dtUsedMin:"", phases:[], start:"", ascentStart:"", surface:"", mdd:cleanMddValue(div.defaultMdd,{clamp:true,fallback:6}), rule:"auto", daypart:"1", notes:"", signalHolder:"", setNo:div.setNo||"", maskNo:div.maskNo||""});
   }
   function latestActiveDive(diverId){ return [...state.live].reverse().find(d=>d.diverId===diverId && d.start && !d.surface); }
   // Een afgesloten duik (boven gemeld) waarvan de einddruk nog niet is vastgelegd
@@ -2324,32 +2372,36 @@
   function startLiveDiveFor(diverId, airStartBar){
     const bar = validBar(airStartBar);
     const diver = getDiver(diverId);
-    if(!isDiverActive(diver) || latestActiveDive(diverId) || bar == null || bar > 400) return false;
+    if(!isDiverActive(diver) || latestActiveDive(diverId) || bar == null) return false;
     state.live.push(newLiveDive(diverId, bar));
     return true;
   }
   function validBar(value){
     const n = parseNum(value);
-    return Number.isFinite(n) && n > 0 && n <= 400 ? n : null;
+    return Number.isFinite(n) && n > 0 && n <= MAX_BAR ? n : null;
+  }
+  function cleanBarValue(value){
+    const n = validBar(value);
+    return n == null ? "" : Math.round(n);
   }
   function airMeasurements(d){
     ensureAirFields(d);
     return d.airMeasurements
-      .map((m,i)=>({originalIndex:i, time:dateFromTs(m.timeTs) || parseDT(m.time), bar:validBar(m.bar), depth:parseNum(m.depth)}))
+      .map((m,i)=>({originalIndex:i, time:dateFromTs(m.timeTs) || parseDT(m.time), bar:validBar(m.bar), depth:cleanAirDepthValue(m.depth)}))
       .filter(m=>m.time && m.bar != null)
       .sort((a,b)=>a.time-b.time);
   }
   function addAirMeasurement(d, bar, time=new Date(), depth=""){
     ensureAirFields(d);
     const n = validBar(bar);
-    if(n == null || n > 400) return false;
+    if(n == null) return false;
     const dt = time instanceof Date ? time : (parseDT(time) || new Date());
-    const mdd = parseNum(depth);
+    const mdd = cleanAirDepthValue(depth, {clamp:true});
     const item = {time:toLocalDTString(dt), timeTs:dt.getTime(), bar:Math.round(n)};
-    if(Number.isFinite(mdd) && mdd >= 0) item.depth = fmtDec(mdd,1);
+    if(mdd !== "") item.depth = mdd;
     d.airMeasurements.push(item);
-    if(Number.isFinite(mdd) && (!Number.isFinite(parseNum(d.mdd)) || mdd > parseNum(d.mdd))){
-      d.mdd = fmtDec(mdd,1);
+    if(mdd !== "" && (!Number.isFinite(parseNum(d.mdd)) || mdd > parseNum(d.mdd))){
+      d.mdd = mdd;
       updateAirCheckInterval(d);
     }
     return true;
@@ -2445,14 +2497,14 @@
     const startDisplay = a.startBar == null ? "—" : fmtBar(a.startBar);
     const beginField = lockedStart
       ? `<div class="f6"><label>Begindruk (bar)</label><div class="locked-value">${esc(startDisplay)}</div></div>`
-      : `<div class="f6"><label>Begindruk (bar)</label><input aria-label="Begindruk (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="400" data-air-start="${esc(d.id)}" value="${esc(d.airStartBar||'')}" placeholder="bijv. 300"></div>`;
+      : `<div class="f6"><label>Begindruk (bar)</label><input aria-label="Begindruk (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-air-start="${esc(d.id)}" value="${esc(d.airStartBar||'')}" placeholder="bijv. 300"></div>`;
     return `<div class="airbox">
       <div class="airhead"><strong>Ademluchtbewaking</strong></div>
       <div class="fieldrow no-print">
         ${beginField}
       </div>
       <div class="airaction no-print">
-        <div class="air-measure-field ${airInputAttentionClass(a)}" data-air-input-wrap="${esc(d.id)}"><label>Nieuwe meting (bar)</label><input aria-label="Nieuwe meting (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="400" data-air-input="${esc(d.id)}" value="${esc(pendingAirInputs[d.id] || '')}" placeholder="bijv. 270"></div>
+        <div class="air-measure-field ${airInputAttentionClass(a)}" data-air-input-wrap="${esc(d.id)}"><label>Nieuwe meting (bar)</label><input aria-label="Nieuwe meting (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-air-input="${esc(d.id)}" value="${esc(pendingAirInputs[d.id] || '')}" placeholder="bijv. 270"></div>
         <div class="air-measure-field ${airInputAttentionClass(a)}"><label>Diepte bij meting (m)</label><input aria-label="Diepte bij meting (m)" class="user" type="text" inputmode="decimal" data-air-depth-input="${esc(d.id)}" value="${esc(pendingAirDepthInputs[d.id] || '')}" placeholder="bijv. 8,5"></div>
         <div class="aircheck-card nextcheck ${airNextClass(a)}" data-air-next-wrap="${esc(d.id)}"><span>Volgende check</span><strong data-air-next-text="${esc(d.id)}">${esc(airNextText(a))}</strong></div>
         <div class="airaction-save"><button class="primary" data-air-add="${esc(d.id)}">Lucht-/dieptemeting opslaan</button></div>
@@ -2464,7 +2516,7 @@
         <div class="airmetric"><span>Trendverbruik</span><strong>${a.rateBarMin == null ? "—" : `${fmtDec(a.rateBarMin,1)} bar/min`}</strong><span>${a.rateLitersMin == null ? "" : `${fmtDec(a.rateLitersMin,0)} L/min`}</span></div>
         <div class="airmetric"><span>Set / grens</span><strong>2×4 L</strong><span>tot 100 bar</span></div>
       </div>
-      <details class="airdetails no-print" data-detail-key="airmanage:${esc(d.id)}" ${openDetailKeys["airmanage:"+d.id] ? "open" : ""}><summary>Correctie / beheer</summary><div class="fieldrow"><div class="f6"><label>Begindruk corrigeren (bar)</label><input aria-label="Begindruk corrigeren (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="400" data-air-start-correct="${esc(d.id)}" value="${esc(d.airStartBar||'')}" placeholder="bijv. 300"></div><div class="f6"><label>&nbsp;</label><button class="mini ghost" data-air-delete-last="${esc(d.id)}" ${a.measurements.length?'':'disabled'}>Wis laatste luchtmeting</button></div></div></details>
+      <details class="airdetails no-print" data-detail-key="airmanage:${esc(d.id)}" ${openDetailKeys["airmanage:"+d.id] ? "open" : ""}><summary>Correctie / beheer</summary><div class="fieldrow"><div class="f6"><label>Begindruk corrigeren (bar)</label><input aria-label="Begindruk corrigeren (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-air-start-correct="${esc(d.id)}" value="${esc(d.airStartBar||'')}" placeholder="bijv. 300"></div><div class="f6"><label>&nbsp;</label><button class="mini ghost" data-air-delete-last="${esc(d.id)}" ${a.measurements.length?'':'disabled'}>Wis laatste luchtmeting</button></div></div></details>
       ${a.messages.length ? `<ul class="messages">${a.messages.slice(0,3).map(m=>`<li>${esc(m)}</li>`).join("")}</ul>` : ""}
       <details class="airdetails" data-detail-key="airhistory:${esc(d.id)}" ${openDetailKeys["airhistory:"+d.id] ? "open" : ""}><summary>Meetgeschiedenis (${a.measurements.length})</summary><div class="tablewrap"><table class="table"><thead><tr><th>#</th><th>Tijd</th><th>Druk</th><th>Diepte</th></tr></thead><tbody>${airMeasurementsRows(a.measurements)}</tbody></table></div></details>
     </div>`;
@@ -2482,7 +2534,7 @@
     if(firstStartBar == null && !points.length) return "";
     const last = points[points.length-1] || null;
     const low = points.length ? Math.min(...points.map(p=>p.bar)) : null;
-    const rows = points.map((p,i)=>`<tr><td>${i+1}</td><td>${fmtTime(p.time)}</td><td>${fmtBar(p.bar)}</td><td>${Number.isFinite(p.depth) ? fmtDec(p.depth,1)+" m" : "—"}</td></tr>`).join("");
+    const rows = points.map((p,i)=>`<tr><td>${i+1}</td><td>${fmtClockMinute(p.time)}</td><td>${fmtBar(p.bar)}</td><td>${Number.isFinite(p.depth) ? fmtDec(p.depth,1)+" m" : "—"}</td></tr>`).join("");
     return `<div class="small" style="margin-top:6px"><b>Ademlucht</b>: start ${firstStartBar==null?'—':fmtBar(firstStartBar)} · eind ${last?fmtBar(last.bar):'—'} · laagste ${low==null?'—':fmtBar(low)} · grens 100 bar</div>${points.length ? `<div class="tablewrap"><table class="table"><thead><tr><th>#</th><th>Tijd</th><th>Druk</th><th>Diepte</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}`;
   }
 
@@ -2530,18 +2582,18 @@
     return `<div class="diver-card">
       <h3>${esc(displayDiver(d))} <span class="pill ${s.cls}">${s.txt}</span> <button type="button" class="notepen no-print ${noteVal?'has-note':''}" data-note-toggle="${esc(d.id)}" title="Notitie bij deze duiker" aria-label="Notitie bij deze duiker">✎</button></h3>
       ${noteOpen ? `<div class="noteedit no-print"><textarea aria-label="Notitie" class="user" data-note-input="${esc(d.id)}" placeholder="Notitie bij ${esc(displayDiver(d))}">${esc(noteVal)}</textarea><div class="btnrow"><button class="mini primary" data-note-save="${esc(d.id)}">Bewaren</button></div></div>` : (noteVal ? `<div class="notebox" title="Notitie">✎ ${esc(noteVal)}</div>` : "")}
-      <div class="fieldrow">${active ? "" : `<div class="f12"><label>Begindruk (bar)</label><input aria-label="Begindruk (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="400" data-start-bar="${esc(d.id)}" value="${esc(pendingStartBars[d.id] || '')}" placeholder="bijv. 300"></div>`}<div class="f6"><label>MDD</label><input aria-label="MDD" class="user" type="text" inputmode="decimal" data-${active?'active':'default'}-mdd="${esc(active?.id || d.id)}" value="${esc(active ? active.mdd : (d.defaultMdd||6))}"></div><div class="f6"><label>Laatste HG</label><input aria-label="Laatste HG" disabled value="${esc(last?.hgAdjusted||last?.hgRaw||'—')}"></div></div>
+      <div class="fieldrow">${active ? "" : `<div class="f12"><label>Begindruk (bar)</label><input aria-label="Begindruk (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-start-bar="${esc(d.id)}" value="${esc(pendingStartBars[d.id] || '')}" placeholder="bijv. 300"></div>`}<div class="f6"><label>MDD</label><input aria-label="MDD" class="user" type="text" inputmode="decimal" data-${active?'active':'default'}-mdd="${esc(active?.id || d.id)}" value="${esc(active ? active.mdd : (d.defaultMdd||6))}"></div><div class="f6"><label>Laatste HG</label><input aria-label="Laatste HG" disabled value="${esc(last?.hgAdjusted||last?.hgRaw||'—')}"></div></div>
       <div class="statusline"><span class="pill neutral">Duiken: ${events.length}</span><span class="pill ${active?'live':'neutral'}">${active?'ACTIEF: ja':'Actief: nee'}</span>${events.length ? opkomstBadge({...events[events.length-1], dataset:"live"}) : ""}</div>
       <div class="bigbuttons no-print"><button class="good" data-live-start="${esc(d.id)}" ${startDisabled}>${active?'Duik loopt':'Start duik'}</button><button class="warn" data-live-ascent="${esc(d.id)}" ${ascentDisabled}>${active?.ascentStart?'Opkomst loopt':'Opkomst'}</button><button class="primary fullwidth" data-live-surface="${esc(d.id)}" ${surfaceDisabled}>Boven / einde</button></div>
-      ${awaitingEndBar ? `<div class="endbarbox"><div class="endbarhead">Einddruk van het toestel noteren</div><div class="fieldrow"><div class="f8"><label>Einddruk (bar)</label><input aria-label="Einddruk (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="400" data-endbar-input="${esc(awaitingEndBar.id)}" value="${esc(pendingEndBars[awaitingEndBar.id] || '')}" placeholder="bijv. 110"></div><div class="f4"><label>&nbsp;</label><button class="primary fullwidth" data-endbar-save="${esc(awaitingEndBar.id)}">Vastleggen</button></div></div></div>` : ""}
+      ${awaitingEndBar ? `<div class="endbarbox"><div class="endbarhead">Einddruk van het toestel noteren</div><div class="fieldrow"><div class="f8"><label>Einddruk (bar)</label><input aria-label="Einddruk (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-endbar-input="${esc(awaitingEndBar.id)}" value="${esc(pendingEndBars[awaitingEndBar.id] || '')}" placeholder="bijv. 110"></div><div class="f4"><label>&nbsp;</label><button class="primary fullwidth" data-endbar-save="${esc(awaitingEndBar.id)}">Vastleggen</button></div></div></div>` : ""}
       ${active ? renderAirBlock(active) : ""}
       ${!active ? renderRepeatProjection(d, last) : ""}
       ${last?.messages?.length ? `<ul class="messages">${last.messages.slice(0,3).map(m=>`<li>${esc(m)}</li>`).join("")}</ul>` : ""}
     </div>`;
   }
   function wireLiveButtons(){
-    document.querySelectorAll("[data-default-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.divers.find(x=>x.id===inp.dataset.defaultMdd); if(d){ let v=parseNum(inp.value)||6; if(v>15){ v=15; alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); } d.defaultMdd=v; } }));
-    document.querySelectorAll("[data-active-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.activeMdd); if(d){ let v=parseNum(inp.value)||d.mdd||6; if(v>15){ v=15; alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); } d.mdd=v; updateAirCheckInterval(d); } }));
+    document.querySelectorAll("[data-default-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.divers.find(x=>x.id===inp.dataset.defaultMdd); if(d){ const raw=parseNum(inp.value); const v=cleanMddValue(inp.value,{clamp:true,fallback:6}); if(Number.isFinite(raw) && raw>MAX_MDD) alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); d.defaultMdd=v; inp.value=v; } }));
+    document.querySelectorAll("[data-active-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.activeMdd); if(d){ const raw=parseNum(inp.value); const v=cleanMddValue(inp.value,{clamp:true,fallback:d.mdd||6}); if(Number.isFinite(raw) && raw>MAX_MDD) alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); d.mdd=v; inp.value=v; updateAirCheckInterval(d); } }));
     document.querySelectorAll("[data-start-bar]").forEach(inp=>{
       pendingStartBars[inp.dataset.startBar] = inp.value;
       inp.oninput = ()=>{ pendingStartBars[inp.dataset.startBar] = inp.value; };
@@ -2551,13 +2603,13 @@
       const diverId = btn.dataset.liveStart;
       const inp = document.querySelector(`[data-start-bar="${diverId}"]`);
       const n = validBar(inp?.value);
-      if(n == null || n > 400){ alert("Vul eerst een geldige begindruk (bar) in."); inp?.focus(); return; }
+      if(n == null){ alert(`Vul eerst een geldige begindruk in (1-${MAX_BAR} bar).`); inp?.focus(); return; }
       mutate(()=>{ if(startLiveDiveFor(diverId, n)) delete pendingStartBars[diverId]; });
     });
     document.querySelectorAll("[data-live-ascent]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=latestActiveDive(btn.dataset.liveAscent); if(d && !d.ascentStart) stampField(d, "ascentStart", new Date()); }); });
     document.querySelectorAll("[data-live-surface]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=latestActiveDive(btn.dataset.liveSurface); if(d){ const now=new Date(); stampField(d, "surface", now); const a=airAnalysis(d); if(a.last) d.airEndBar = a.last.bar; } }); });
-    document.querySelectorAll("[data-air-start]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.airStart); if(d){ ensureAirFields(d); d.airStartBar = inp.value; } }));
-    document.querySelectorAll("[data-air-start-correct]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.airStartCorrect); if(d){ ensureAirFields(d); d.airStartBar = inp.value; } }));
+    document.querySelectorAll("[data-air-start]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.airStart); if(d){ ensureAirFields(d); d.airStartBar = cleanBarValue(inp.value); inp.value = d.airStartBar; } }));
+    document.querySelectorAll("[data-air-start-correct]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.airStartCorrect); if(d){ ensureAirFields(d); d.airStartBar = cleanBarValue(inp.value); inp.value = d.airStartBar; } }));
     document.querySelectorAll("[data-air-input]").forEach(inp=>{
       pendingAirInputs[inp.dataset.airInput] = inp.value;
       inp.oninput = ()=>{ pendingAirInputs[inp.dataset.airInput] = inp.value; };
@@ -2569,7 +2621,16 @@
     document.querySelectorAll("[data-detail-key]").forEach(det=>{
       det.ontoggle = ()=>{ openDetailKeys[det.dataset.detailKey] = det.open; };
     });
-    document.querySelectorAll("[data-air-add]").forEach(btn=>btn.onclick=()=>{ const id=btn.dataset.airAdd; const inp=document.querySelector(`[data-air-input="${id}"]`); const depthInp=document.querySelector(`[data-air-depth-input="${id}"]`); const bar=inp?.value; const n=validBar(bar); if(n==null || n>400){ alert("Vul een geldige druk in bar in."); return; } mutate(()=>{ const d=state.live.find(x=>x.id===id); if(d && addAirMeasurement(d,n,new Date(),depthInp?.value || "")){ delete pendingAirInputs[id]; delete pendingAirDepthInputs[id]; } }); });
+    document.querySelectorAll("[data-air-add]").forEach(btn=>btn.onclick=()=>{
+      const id=btn.dataset.airAdd;
+      const inp=document.querySelector(`[data-air-input="${id}"]`);
+      const depthInp=document.querySelector(`[data-air-depth-input="${id}"]`);
+      const n=validBar(inp?.value);
+      if(n==null){ alert(`Vul een geldige druk in bar in (1-${MAX_BAR}).`); return; }
+      const rawDepth = parseNum(depthInp?.value);
+      if(Number.isFinite(rawDepth) && rawDepth > MAX_MDD){ depthInp.value = String(MAX_MDD); alert("Maximale diepte bij meting is 15 m. De waarde is teruggezet naar 15."); }
+      mutate(()=>{ const d=state.live.find(x=>x.id===id); if(d && addAirMeasurement(d,n,new Date(),depthInp?.value || "")){ delete pendingAirInputs[id]; delete pendingAirDepthInputs[id]; } });
+    });
     document.querySelectorAll("[data-air-delete-last]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=state.live.find(x=>x.id===btn.dataset.airDeleteLast); if(d) deleteLastAirMeasurement(d); }); });
     document.querySelectorAll("[data-endbar-input]").forEach(inp=>{
       pendingEndBars[inp.dataset.endbarInput] = inp.value;
@@ -2579,8 +2640,8 @@
       const id = btn.dataset.endbarSave;
       const inp = document.querySelector(`[data-endbar-input="${id}"]`);
       const n = validBar(inp?.value);
-      if(n == null || n > 400){ alert("Vul een geldige einddruk in bar in."); inp?.focus(); return; }
-      mutate(()=>{ const d=state.live.find(x=>x.id===id); if(d){ ensureAirFields(d); d.airEndBar = n; delete pendingEndBars[id]; } });
+      if(n == null){ alert(`Vul een geldige einddruk in bar in (1-${MAX_BAR}).`); inp?.focus(); return; }
+      mutate(()=>{ const d=state.live.find(x=>x.id===id); if(d){ ensureAirFields(d); d.airEndBar = Math.round(n); delete pendingEndBars[id]; } });
     });
     document.querySelectorAll("[data-note-toggle]").forEach(btn=>btn.onclick=()=>{ const id=btn.dataset.noteToggle; openDiverNotes[id] = !openDiverNotes[id]; render(); });
     document.querySelectorAll("[data-note-save]").forEach(btn=>btn.onclick=()=>{ const id=btn.dataset.noteSave; const inp=document.querySelector(`[data-note-input="${id}"]`); mutate(()=>{ const d=state.divers.find(x=>x.id===id); if(d){ d.note = cleanNote(inp?.value||""); } openDiverNotes[id]=false; }); });
@@ -2715,14 +2776,14 @@
 
   function reportMomentRows(unit){
     if(unit.events.length <= 1) return "";
-    const rows = unit.events.map((e,i)=>`<tr><td>${i+1}</td><td>${registrationTypeLabel(e.registrationType)}</td><td>${fmtTime(e.start)}</td><td>${fmtTime(e.ascentStart)}</td><td>${fmtTime(e.surface)}</td><td>${esc(e.mdd||'—')} m</td><td>${fmtMin(e.dtMin)} min</td><td>${esc(e.dtSource||'—')}</td><td>${esc(phaseSummary(e)||'—')}</td><td>${esc(e.notes||'')}</td></tr>`).join("");
+    const rows = unit.events.map((e,i)=>`<tr><td>${i+1}</td><td>${registrationTypeLabel(e.registrationType)}</td><td>${fmtClockMinute(e.start)}</td><td>${fmtClockMinute(e.ascentStart)}</td><td>${fmtClockMinute(e.surface)}</td><td>${esc(e.mdd||'—')} m</td><td>${fmtMin(e.dtMin)} min</td><td>${esc(e.dtSource||'—')}</td><td>${esc(phaseSummary(e)||'—')}</td><td>${esc(e.notes||'')}</td></tr>`).join("");
     return `<div class="small"><b>Losse duikmomenten (${unit.events.length})</b></div><div class="tablewrap"><table class="table"><thead><tr><th>#</th><th>Type</th><th>Tijd in</th><th>Opkomst</th><th>Boven</th><th>MDD</th><th>DT</th><th>DT-bron</th><th>Fasen</th><th>Opmerking</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   function reportRow(unit,i){
     const s=severityLabel(unit?.severity??1);
     const regel = calculationLabel(unit);
     const moments = unit.events.length > 1 ? `${unit.events.length} momenten` : "1 moment";
-    return `<tr><td>${i+1}</td><td>${esc(unit.diverLabel)}</td><td>${daypartLabel(unit.daypart)}</td><td>${esc(regel)}</td><td>${fmtTime(unit.start)}</td><td>${fmtTime(unit.surface)}</td><td>${esc(unit.mddMax||'—')} m</td><td>${fmtMin(unit.dtTotal)} min<br><span class="small muted">${esc(unit.dtSource||'—')}</span></td><td>${esc(unit.hgAdjusted||unit.hgRaw||'—')}</td><td>${fmtHF(unit.hf)}</td><td>${fmtMin(unit.edt)}</td><td>${moments}${reportMomentRows(unit)}${airSummaryForUnit(unit)}</td><td><span class="pill ${s.cls}">${s.txt}</span>${renderMessages(unit)}</td></tr>`;
+    return `<tr><td>${i+1}</td><td>${esc(unit.diverLabel)}</td><td>${daypartLabel(unit.daypart)}</td><td>${esc(regel)}</td><td>${fmtClockMinute(unit.start)}</td><td>${fmtClockMinute(unit.surface)}</td><td>${esc(unit.mddMax||'—')} m</td><td>${fmtMin(unit.dtTotal)} min<br><span class="small muted">${esc(unit.dtSource||'—')}</span></td><td>${esc(unit.hgAdjusted||unit.hgRaw||'—')}</td><td>${fmtHF(unit.hf)}</td><td>${fmtMin(unit.edt)}</td><td>${moments}${reportMomentRows(unit)}${airSummaryForUnit(unit)}</td><td><span class="pill ${s.cls}">${s.txt}</span>${renderMessages(unit)}</td></tr>`;
   }
   function renderReport(){
     const calc = calcDataset(reportDataset);
@@ -2774,7 +2835,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.0.0", APP_VERSION, APP_VERSION==="v1.0.0");
+    push("basis","Appversielabel", "v1.1.0", APP_VERSION, APP_VERSION==="v1.1.0");
     push("basis","Publieke website-url", "https://duikmonitor.app/", PUBLIC_APP_URL, PUBLIC_APP_URL==="https://duikmonitor.app/");
     push("basis","GitHub repository-url", "https://github.com/streuper/duikmonitor", REPO_URL, REPO_URL==="https://github.com/streuper/duikmonitor");
     // Laatste OI-kolom moet de bronnotatie volgen (IWOD 2019 / DCIEM 1992: 15:00-18:00),
@@ -2849,6 +2910,8 @@
     push("ui","Instellingen bevat publieke site en GitHub-route", "website/repo/issues/security", ["PUBLIC_APP_URL","REPO_URL","ISSUE_URL","SECURITY_URL"].every(x=>settingsHtmlSource.includes(x)) ? "website/repo/issues/security" : "ontbreekt", ["PUBLIC_APP_URL","REPO_URL","ISSUE_URL","SECURITY_URL"].every(x=>settingsHtmlSource.includes(x)));
     push("ui","Instellingen waarschuwt tegen persoonsgegevens in meldingen", "geen echte namen", settingsHtmlSource.includes("geen echte namen") ? "geen echte namen" : "ontbreekt", settingsHtmlSource.includes("geen echte namen"));
     push("ui","Instellingen bevat publieke GitHub-route", "duikmonitor.app + GitHub", settingsHtmlSource.includes("Meedenken en melden") && settingsHtmlSource.includes("PUBLIC_APP_URL") && settingsHtmlSource.includes("ISSUE_URL") ? "duikmonitor.app + GitHub" : "ontbreekt", settingsHtmlSource.includes("Meedenken en melden") && settingsHtmlSource.includes("PUBLIC_APP_URL") && settingsHtmlSource.includes("ISSUE_URL"));
+    push("ui","Over deze tool staat standaard ingeklapt", "details zonder open", settingsHtmlSource.includes('<summary aria-label="Over deze tool openen of sluiten">Over deze tool</summary>') && !settingsHtmlSource.includes('<h3>Over deze tool</h3>') ? "details zonder open" : "afwijkend", settingsHtmlSource.includes('<summary aria-label="Over deze tool openen of sluiten">Over deze tool</summary>') && !settingsHtmlSource.includes('<h3>Over deze tool</h3>'));
+    push("ui","Seinhouder-label is voluit in instellingen", "Seinhouder", settingsHtmlSource.includes("<th>Seinhouder</th>") && settingsHtmlSource.includes("Seinhouder is de seinhouder") ? "Seinhouder" : "ontbreekt", settingsHtmlSource.includes("<th>Seinhouder</th>") && settingsHtmlSource.includes("Seinhouder is de seinhouder"));
     push("basis","Standaard MDD na reset", "6 m", defaultState().divers[0].defaultMdd + " m", defaultState().divers.every(d=>d.defaultMdd===6));
     push("basis","D1 t/m D12 beschikbaar", "12 duikers", defaultState().divers.length + " duikers", defaultState().divers.length===12);
     push("basis","Standaardcodes D1 t/m D12", "D1 … D12", defaultState().divers[0].code + " … " + defaultState().divers[11].code, defaultState().divers[0].code==="D1" && defaultState().divers[11].code==="D12");
@@ -2875,12 +2938,19 @@
     push("privacy","Import saneert onveilige id naar veilige id", "veilige id + D1", `${SAFE_ID_RE.test(importSafe.id)}/${importSafe.diverId}`, SAFE_ID_RE.test(importSafe.id) && importSafe.diverId==="D1");
     const importUnknownDiver = testState({},()=>{ importStateObject({divers:[{id:"D1",code:"D1",label:""}], planning:[{id:"p1",diverId:"D13",start:`${today}T09:00:00`,dtMin:10,mdd:6,daypart:"1",rule:"auto",notes:"buiten scope"}]}); return state.planning.length; });
     push("rekenregels","Import slaat registratie met onbekende duiker over (geen stille remap naar D1)", "0 regels", String(importUnknownDiver), importUnknownDiver===0);
-    const importBarClean = testState({},()=>{ importStateObject({divers:[{id:"D1",code:"D1",label:""}], live:[{id:"l1",diverId:"D1",entryMode:"achteraf",start:`${today}T09:00:00`,mdd:9,daypart:"1",rule:"normal",notes:"",airStartBar:9999,airEndBar:300}]}); return {start:state.live[0]?.airStartBar, end:state.live[0]?.airEndBar}; });
-    push("rekenregels","Import maakt ongeldige barwaarde (9999) leeg, geldige (300) blijft", "leeg / 300", `${importBarClean.start===""?"leeg":importBarClean.start} / ${importBarClean.end}`, importBarClean.start==="" && importBarClean.end===300);
+    const importBarClean = testState({},()=>{ importStateObject({divers:[{id:"D1",code:"D1",label:""}], live:[{id:"l1",diverId:"D1",entryMode:"achteraf",start:`${today}T09:00:00`,mdd:9,daypart:"1",rule:"normal",notes:"",airStartBar:331,airEndBar:330}]}); return {start:state.live[0]?.airStartBar, end:state.live[0]?.airEndBar}; });
+    push("rekenregels","Import maakt barwaarden boven 330 leeg, 330 blijft", "leeg / 330", `${importBarClean.start===""?"leeg":importBarClean.start} / ${importBarClean.end}`, importBarClean.start==="" && importBarClean.end===330);
     const importAirCleanup = testState({},()=>{ const res = importStateObject({divers:[{id:"D1",code:"D1",label:""}], live:[{id:"l2",diverId:"D1",entryMode:"achteraf",start:`${today}T09:00:00`,mdd:9,daypart:"1",rule:"normal",notes:"",measurements:[{time:`${today}T09:05:00`,bar:9999},{time:`${today}T09:10:00`,bar:250,depth:"9,0"}]}]}); return {bars:(state.live[0]?.airMeasurements||[]).map(m=>`${m.bar}@${m.depth||""}`).join("|"), cleaned:res.cleanedBars}; });
     push("rekenregels","Import migreert legacy-measurements naar geldige airMeasurements", "250@9", importAirCleanup.bars, importAirCleanup.bars==="250@9" && importAirCleanup.cleaned>=1);
+    const importDepthCleanup = testState({},()=>{ importStateObject({divers:[{id:"D1",code:"D1",label:""}], live:[{id:"l3",diverId:"D1",entryMode:"achteraf",start:`${today}T09:00:00`,surface:`${today}T09:10:00`,mdd:16,daypart:"1",rule:"normal",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:250,depth:16}]}]}); const u=calcDataset("live").units[0]; return {mdd:state.live[0]?.mdd, tableDepth:u?.tableDepth, maxDepth:maxDepthForEvent(state.live[0])}; });
+    push("rekenregels","Import met MDD boven 15 komt niet als geldige >15m-berekening in de motor", "MDD leeg / tabeldepth null", `${importDepthCleanup.mdd===""?"leeg":importDepthCleanup.mdd} / ${importDepthCleanup.tableDepth}`, importDepthCleanup.mdd==="" && importDepthCleanup.tableDepth==null && importDepthCleanup.maxDepth==="");
     const projectFieldsClean = testState({project:{date:"niet-goed", location:"  A\nB  "+"x".repeat(200), post:"  Post\tPloeg  ", dpl:"  DPL\n1  "}},()=>{ ensureProjectMeta(); return {dateOk:/^\d{4}-\d{2}-\d{2}$/.test(state.project.date), locLen:state.project.location.length, post:state.project.post, dpl:state.project.dpl}; });
-    push("privacy","Projectvelden worden bij import begrensd en op een regel gezet", "datum ok / locatie <=120 / Post Ploeg / DPL 1", `${projectFieldsClean.dateOk}/${projectFieldsClean.locLen<=120}/${projectFieldsClean.post}/${projectFieldsClean.dpl}`, projectFieldsClean.dateOk && projectFieldsClean.locLen<=120 && projectFieldsClean.post==="Post Ploeg" && projectFieldsClean.dpl==="DPL 1");
+    push("privacy","Projectvelden worden bij import begrensd en op een regel gezet", "datum ok / locatie <=25 / Post Ploeg / DPL 1", `${projectFieldsClean.dateOk}/${projectFieldsClean.locLen<=25}/${projectFieldsClean.post}/${projectFieldsClean.dpl}`, projectFieldsClean.dateOk && projectFieldsClean.locLen<=25 && projectFieldsClean.post==="Post Ploeg" && projectFieldsClean.dpl==="DPL 1");
+    push("privacy","Locatie wordt max 25 karakters", "25", String(cleanLocation("x".repeat(30)).length), cleanLocation("x".repeat(30)).length===25);
+    push("privacy","Post/Ploeg wordt max 25 karakters", "25", String(cleanProjectText("p".repeat(30)).length), cleanProjectText("p".repeat(30)).length===25);
+    push("privacy","DPL wordt max 8 karakters", "8", String(cleanDpl("d".repeat(30)).length), cleanDpl("d".repeat(30)).length===8);
+    const roundTrip = testState({project:{date:today,location:"Oefenlocatie",post:"Post 1",dpl:"DPL1"},divers:[{id:"D1",code:"D1",label:"K01",defaultMdd:9,setNo:"02",maskNo:"03"}],live:[ensureAirFields({id:"rt1",diverId:"D1",entryMode:"achteraf",registrationType:"normal",dtMode:"auto",start:`${today}T09:00:00`,surface:`${today}T09:12:19`,mdd:9,daypart:"1",rule:"auto",notes:"rondtrip",airStartBar:300,airEndBar:240,setNo:"02",maskNo:"03",airMeasurements:[{time:`${today}T09:05:00`,bar:270,depth:9}]})]},()=>{ const beforeRows=registrationRowsForExport().map(r=>r.join("|")).join("\n"); const json=JSON.stringify(state); importStateObject(JSON.parse(json)); const afterRows=registrationRowsForExport().map(r=>r.join("|")).join("\n"); return {rowsEqual:beforeRows===afterRows, setNo:state.live[0]?.setNo, maskNo:state.live[0]?.maskNo, mdd:state.live[0]?.mdd, bar:state.live[0]?.airStartBar}; });
+    push("export","Synthetische JSON-rondtrip behoudt betekenisvolle registratie", "gelijk / 02 / 03 / 9 / 300", `${roundTrip.rowsEqual}/${roundTrip.setNo}/${roundTrip.maskNo}/${roundTrip.mdd}/${roundTrip.bar}`, roundTrip.rowsEqual && roundTrip.setNo==="02" && roundTrip.maskNo==="03" && roundTrip.mdd===9 && roundTrip.bar===300);
     push("privacy","CSV-export neutraliseert formules", "'=1+1", csvSafe("=1+1"), csvSafe("=1+1")==="'=1+1");
     const xlsxFormulaXml = sheetXml([["=1+1"]]);
     push("privacy","XLSX-export bewaart formuleachtige tekst als inlineStr", "inlineStr zonder formulecel", /t="inlineStr"/.test(xlsxFormulaXml) && !/<f[\s>]/.test(xlsxFormulaXml) ? "inlineStr zonder formulecel" : xlsxFormulaXml, /t="inlineStr"/.test(xlsxFormulaXml) && !/<f[\s>]/.test(xlsxFormulaXml));
@@ -3128,8 +3198,8 @@
     // Bevinding 2: incomplete fasen onderschatten DT niet stilzwijgend, maar blokkeren hard.
     const phInc = testState({live:[ensureAirFields({id:"p1",diverId:"D1",entryMode:"achteraf",dtMode:"phases",start:"2026-05-23T09:00:00",mdd:9,daypart:"1",rule:"normal",notes:"",phases:[{start:"2026-05-23T09:00:00",end:"2026-05-23T09:10:00"},{start:"2026-05-23T09:15:00",end:""}]})]},()=>calcDataset("live").units[0]);
     push("rekenregels","Fasen: incomplete fase blokkeert i.p.v. DT onderschatten (sev 2)", "sev 2, geblokkeerd", `sev ${phInc?.severity}`, phInc?.severity===2 && (phInc?.messages||[]).some(m=>m.includes("Niet alle fasen zijn compleet")));
-    // Bevinding 4a: validBar begrenst centraal tot 400 bar.
-    push("rekenregels","validBar: 9999 en 401 afgewezen, 300 en 400 toegestaan", "null/null/300/400", `${validBar(9999)}/${validBar(401)}/${validBar(300)}/${validBar(400)}`, validBar(9999)===null && validBar(401)===null && validBar(300)===300 && validBar(400)===400);
+    // Drukvelden zijn centraal begrensd tot 330 bar.
+    push("rekenregels","validBar: 330 geldig en 331 ongeldig", "330/null", `${validBar(330)}/${validBar(331)}`, validBar(330)===330 && validBar(331)===null);
     // Bevinding 4b: import van te veel duikers wordt gecapt op de scope van 12.
     const manyDivers = testState({divers:Array.from({length:200},(_,i)=>({id:"D"+(i+1),code:"D"+(i+1),label:""}))},()=>state.divers.length);
     push("rekenregels","Import: 200 duikers wordt gecapt op 12 (scope D1–D12)", "12", String(manyDivers), manyDivers===12);
@@ -3226,7 +3296,11 @@
     const over12TotalOnly = testState({planning:[ev("D1","09:00:00",70,12,"1","s12"),ev("D1","10:30:00",60,12,"1","s12")]},()=>calcDataset("planning").units[0]);
     push("buiten bereik","Alleen 12m-totaaltijd overschrijden triggert geen D-procedure", "geen observatie/compressietank", (over12TotalOnly?.messages||[]).join(" | ") || "geen", !(over12TotalOnly?.messages||[]).some(m=>m.includes("compressietank")));
     const over15 = testState({planning:[ev("D1","09:00:00",10,16,"1","normal")]},()=>calcDataset("planning").units[0]);
-    push("buiten bereik","MDD >15 m is buiten toepassingsbereik", "buiten toepassingsbereik", (over15?.messages||[]).join(" | ") || "geen", (over15?.messages||[]).some(m=>m.includes("buiten toepassingsbereik")));
+    push("buiten bereik","MDD boven 15 wordt niet als geldige tabel-MDD gebruikt", "geen tabeldiepte", String(over15?.tableDepth), over15?.tableDepth == null);
+    push("buiten bereik","MDD 15 is geldig", "15", String(tableDepth(15)), tableDepth(15)===15);
+    push("buiten bereik","tableDepth boven 15 blijft buiten toepassingsbereik", "null", String(tableDepth(16)), tableDepth(16)===null);
+    const airDepthClamp = testState({live:[ensureAirFields({id:"depthclamp",diverId:"D1",start:`${today}T09:00:00`,mdd:14,daypart:"1",rule:"auto",notes:"",airStartBar:300})]},()=>{ const d=state.live[0]; addAirMeasurement(d,250,new Date(`${today}T09:05:00`),16); return {mdd:d.mdd, depth:d.airMeasurements[0]?.depth}; });
+    push("lucht","Lucht-/dieptemeting boven 15 verhoogt MDD niet boven 15", "15 / 15", `${airDepthClamp.mdd} / ${airDepthClamp.depth}`, parseNum(airDepthClamp.mdd)===15 && parseNum(airDepthClamp.depth)===15);
     const missingStartBar = testState({},()=>{ const started=startLiveDiveFor("D1",""); return {started, count:state.live.length}; });
     push("bediening","Start duik vereist begindruk", "start nee / 0 actieve duiken", `${missingStartBar.started}/${missingStartBar.count}`, missingStartBar.started===false && missingStartBar.count===0);
     const startBarStored = testState({},()=>{ const started=startLiveDiveFor("D1",300); return {started, startBar:state.live[0]?.airStartBar}; });
@@ -3248,6 +3322,18 @@
     const regRows = testState({divers:[{id:"D1",label:"L01",defaultMdd:9,setNo:"07",maskNo:"08"}],live:[ensureAirFields({id:"reg1",diverId:"D1",start:`${today}T09:00:00`,ascentStart:`${today}T09:10:00`,surface:`${today}T09:10:30`,mdd:9,daypart:"1",rule:"auto",notes:"registratie",airStartBar:300,setNo:"S-07",maskNo:"M-08",airMeasurements:[{time:`${today}T09:05:00`,bar:270}]})]},()=>registrationRecords()[0]);
     push("registratie","Compact registratieblad neemt materiaal over (2 cijfers)", "07 / 08", `${regRows?.duikset}/${regRows?.masker}`, regRows?.duikset==="07" && regRows?.masker==="08");
     push("registratie","Duikset/masker: alleen cijfers, maximaal twee", "01/12", `${cleanMaterial("S-01")}/${cleanMaterial("M-123")}`, cleanMaterial("S-01")==="01" && cleanMaterial("M-123")==="12");
+    push("registratie","Duikset/masker behouden 02 als tekst", "02/02", `${cleanMaterial("02")}/${cleanMaterial("M-02")}`, cleanMaterial("02")==="02" && cleanMaterial("M-02")==="02");
+    const adminClock = testState({divers:[{id:"D1",code:"D1",label:"AANDUIDING",defaultMdd:9}],live:[ensureAirFields({id:"clock1",diverId:"D1",start:`${today}T10:10:19`,ascentStart:`${today}T10:24:03`,surface:`${today}T10:27:58`,mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300,role:"RD"})]},()=>({rec:registrationRecords()[0], exportFlat:registrationRowsForExport().map(r=>r.join("|")).join("\n"), html:renderRegistration.toString()}));
+    push("registratie","Registratiekloktijd toont geen seconden", "10:10 / 10:24 / 10:27", `${adminClock.rec?.tijdIn} / ${adminClock.rec?.opkomst} / ${adminClock.rec?.boven}`, adminClock.rec?.tijdIn==="10:10" && adminClock.rec?.opkomst==="10:24" && adminClock.rec?.boven==="10:27");
+    push("export","Print-/rapportkloktijd voor administratieve tijden toont geen seconden", "geen 10:10:19", adminClock.exportFlat.includes("10:10:19") ? "seconden" : "geen seconden", !adminClock.exportFlat.includes("10:10:19") && adminClock.exportFlat.includes("10:10"));
+    push("live","Live/opkomsttijd blijft op seconden getest", "10:10:19", fmtTime(parseDT(`${today}T10:10:19`)), fmtTime(parseDT(`${today}T10:10:19`)).endsWith(":19"));
+    push("live","Live drukcheck-/afteltekst blijft minuten:seconden tonen", "over 1:30 min", airNextText({nextCheck:new Date(`${today}T10:11:30`),secondsToNext:90}), airNextText({nextCheck:new Date(`${today}T10:11:30`),secondsToNext:90})==="over 1:30 min");
+    push("rekenregels","Duurtijd rondt conservatief naar boven bij restseconden", "10/11/11/11", `${ceilMinFromMs(600000)}/${ceilMinFromMs(601000)}/${ceilMinFromMs(619000)}/${ceilMinFromMs(659000)}`, ceilMinFromMs(600000)===10 && ceilMinFromMs(601000)===11 && ceilMinFromMs(619000)===11 && ceilMinFromMs(659000)===11);
+    push("privacy","Aanduiding max 8 karakters", "8", String(cleanDiverLabel("ABCDEFGHXYZ").length), cleanDiverLabel("ABCDEFGHXYZ").length===8);
+    push("privacy","Seinhouder max 8 karakters", "8", String(cleanSignalHolder("SH123456789").length), cleanSignalHolder("SH123456789").length===8);
+    push("registratie","Hoofdregistratie bevat geen tabelkop Rol", "geen <th>Rol</th>", adminClock.html.includes("<th>Rol</th>") ? "Rol aanwezig" : "geen <th>Rol</th>", !adminClock.html.includes("<th>Rol</th>"));
+    push("registratie","Interne role/faseninformatie blijft zichtbaar buiten hoofdlogkolom", "Rol in bijzonderheden", adminClock.rec?.bijzonderheden || "", String(adminClock.rec?.bijzonderheden||"").includes("Rol: RD"));
+    push("registratie","Duikerweergave blijft herkenbaar als D1 plus aanduiding", "D1 · AANDUIDI", adminClock.rec?.duiker || "", adminClock.rec?.duiker==="D1 · AANDUIDI");
     const usedOnly = testState({divers:[{id:"D1",code:"D1",label:"",defaultMdd:6,setNo:"01",maskNo:"02"},{id:"D2",code:"D2",label:"",defaultMdd:6,setNo:"03",maskNo:"04"}],live:[ensureAirFields({id:"used1",diverId:"D1",start:`${today}T09:00:00`,surface:`${today}T09:10:00`,mdd:6,daypart:"1",rule:"auto",airStartBar:300})]},()=>({used:registrationDivers().map(d=>diverCode(d)).join("/"), exportFlat:registrationRowsForExport().map(r=>r.join("|")).join("\n")}));
     push("registratie","Registratie toont alleen gebruikte duikers", "D1 zonder D2", usedOnly.used, usedOnly.used==="D1" && !usedOnly.exportFlat.includes("D2|"));
     const rr = testState({divers:[{id:"D1",code:"D1",label:"",defaultMdd:11,setNo:"",maskNo:""},{id:"D2",code:"D2",label:"",defaultMdd:11,setNo:"",maskNo:""}],live:[
@@ -3262,6 +3348,7 @@
     push("achteraf","DT gebruikt handmatig wordt gebruikt voor HG", "33 min / HG D", `${manualMode?.dtTotal} min / HG ${manualMode?.hgAdjusted||manualMode?.hgRaw}`, manualMode?.dtTotal===33 && (manualMode?.hgAdjusted||manualMode?.hgRaw)==="D");
     const phaseReg = testState({live:[{id:"preg",diverId:"D1",entryMode:"achteraf",registrationType:"rolechange",dtMode:"auto",start:`${today}T10:12:00`,surface:`${today}T10:45:00`,mdd:11,daypart:"1",rule:"auto",airStartBar:300,phases:[{role:"RD",start:`${today}T10:12:00`,end:`${today}T10:32:00`,startBar:300,endBar:180}]}]},()=>registrationRecords()[0]);
     push("registratie","Registratieblad toont rolwisseling en fasen", "Rolwisseling RD/ResD + RD", `${phaseReg?.type} / ${phaseReg?.fasen}`, phaseReg?.type==="Rolwisseling RD/ResD" && String(phaseReg?.fasen||"").includes("RD"));
+    push("registratie","Voorbeelddata introduceert geen aparte Rol-kolom in de normale hoofdregistratie", "geen <th>Rol</th>", renderRegistration.toString().includes("<th>Rol</th>") ? "Rol aanwezig" : "geen <th>Rol</th>", !renderRegistration.toString().includes("<th>Rol</th>"));
     const airOne = testState({live:[ensureAirFields({id:"air1",diverId:"D1",start:`${today}T09:00:00`,ascentStart:"",surface:"",mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:270}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:05:30`)));
     push("lucht","Eerste luchtmeting rekent tot 100 bar", "28 min", `${airOne.remainingMin} min`, airOne.remainingMin===28);
     const airTrend = testState({live:[ensureAirFields({id:"air2",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:270},{time:`${today}T09:10:00`,bar:250}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:10:30`)));
@@ -3306,7 +3393,7 @@
       };
     });
     push("voorbeeld","Voorbeeld 2 A15OLV-context", "A15OLV", ex2.scope, ex2.scope==="A15OLV");
-    push("voorbeeld","Voorbeeld 2 locatie = duiktoren/geconditioneerd", "duiktoren + geconditioneerd", ex2.location, /duiktoren/i.test(ex2.location) && /geconditioneerd/i.test(ex2.location));
+    push("voorbeeld","Voorbeeld 2 locatie wordt begrensd en blijft herkenbaar", "duiktoren/geconditionee <=25", ex2.location, /duiktoren/i.test(ex2.location) && /geconditionee/i.test(ex2.location) && ex2.location.length<=25);
     push("voorbeeld","Voorbeeld 2 gebruikt 8 kandidaten in twee dagdelen", "8", ex2.candidates, ex2.candidates===8);
     push("voorbeeld","Totaal personen = 14", "14", ex2.total, ex2.total===14);
     push("voorbeeld","Aantal groepen = 3", "3", ex2.groups, ex2.groups===3);
@@ -3423,7 +3510,7 @@
     state.divers = Array.from({length:DIVER_SLOT_COUNT}, (_,i)=>{
       const id = defaultDiverCode(i);
       const old = byId.get(id) || existing[i] || {};
-      let label = cleanLabel(old.label || "");
+      let label = cleanDiverLabel(old.label || "");
       if(/^Duiker\s*\d+$/i.test(String(old.label || ""))) label = "";
       const rawCode = cleanCode(old.code || "");
       const legacyDefaultCode = "D" + String(i + 1).padStart(2, "0");
@@ -3432,8 +3519,8 @@
       // korte code zoals K01, OD of INS1 wordt bewaard als neutrale aanduiding
       // wanneer er nog geen label stond. Zo blijft bestaande registratie herkenbaar
       // zonder opnieuw vrije duikercodes toe te laten.
-      if(!label && !isDefaultLike) label = cleanLabel(rawCode);
-      const defaultMdd = parseNum(old.defaultMdd);
+      if(!label && !isDefaultLike) label = cleanDiverLabel(rawCode);
+      const defaultMdd = cleanMddValue(old.defaultMdd, {clamp:true, fallback:6});
       const personTypeSource = rawCode || label;
       const active = (old.active === false || old.enabled === false || old.visible === false) ? false : true;
       return {
@@ -3441,10 +3528,10 @@
         code:id,
         label,
         active,
-        defaultMdd:Number.isFinite(defaultMdd) ? defaultMdd : 6,
+        defaultMdd,
         setNo:cleanMaterial(old.setNo ?? old.setNumber ?? old.duiksetNumber ?? ""),
         maskNo:cleanMaterial(old.maskNo ?? old.maskNumber ?? old.maskerNumber ?? ""),
-        sh:cleanCode(old.sh ?? old.signalHolder ?? ""),
+        sh:cleanSignalHolder(old.sh ?? old.signalHolder ?? ""),
         note:cleanNote(old.note ?? ""),
         personType:cleanRole(old.personType || (/^K\d{2,3}$/i.test(personTypeSource) ? "candidate" : "support"))
       };
@@ -3518,7 +3605,8 @@
       const code = diverCode(e.diverId);
       const role = v118EventRole(e);
       const st = stats.get(e.id) || {};
-      const depth = Number.isFinite(parseNum(e.mdd)) ? fmtDec(parseNum(e.mdd),1) : "";
+      const cleanedDepth = cleanMddValue(e.mdd,{fallback:null});
+      const depth = Number.isFinite(cleanedDepth) ? fmtDec(cleanedDepth,1) : "";
       const startBar = validBar(e.airStartBar);
       const endBar = validBar(e.airEndBar);
       if(e.start) rows.push({time:parseDT(e.start), code, role, action:"te water", depth, pressure:startBar==null?"":Math.round(startBar), ref:e.id, opkomst:st.opkomstNr||""});
@@ -3584,7 +3672,8 @@
       if(st.vierUurAantal && st.vierUurAantal > limits.period) hint.push("4-uurs telling controleren");
       if(st.dagAantal && st.dagAantal > limits.day) hint.push("dagtelling controleren");
       const diverNote = (state.divers.find(x=>x.id===e.diverId)?.note || "").trim();
-      const baseNotes = [e.notes || "", diverNote ? "Notitie: "+diverNote : "", ...(unit?.messages||[]), ...hint].filter(Boolean).join(" | ");
+      const roleNote = v118EventRole(e);
+      const baseNotes = [roleNote ? "Rol: "+roleNote : "", e.notes || "", diverNote ? "Notitie: "+diverNote : "", ...(unit?.messages||[]), ...hint].filter(Boolean).join(" | ");
       return {
         id:e.id,
         nr:i+1,
@@ -3597,16 +3686,16 @@
         vierUurAantal:st.vierUurAantal || "",
         dagAantal:st.dagAantal || "",
         dagdeel:daypartLabel(e.daypart),
-        tijdIn:fmtTime(e.start),
-        opkomst:fmtTime(e.ascentStart),
-        boven:fmtTime(e.surface),
+        tijdIn:fmtClockMinute(e.start),
+        opkomst:fmtClockMinute(e.ascentStart),
+        boven:fmtClockMinute(e.surface),
         opkomstCheck:ascentCheckText({...e,dataset:"live"}),
         dt:fmtMin(e.dtMin),
         dtBron:e.dtSource || dtModeLabel(e.dtMode),
         faseSom:fmtMin(e.phaseTotalMin),
         type:registrationTypeLabel(e.registrationType),
         invoer:entryModeLabel(e.entryMode),
-        mdd:Number.isFinite(parseNum(e.mdd)) ? fmtDec(parseNum(e.mdd),1) : "",
+        mdd:Number.isFinite(cleanMddValue(e.mdd,{fallback:null})) ? fmtDec(cleanMddValue(e.mdd,{fallback:null}),1) : "",
         maxDiepte:maxDepthForEvent(e),
         checkPoints:checkPointsForEvent(e),
         drukcheck:updateAirCheckInterval(e),
@@ -3638,7 +3727,7 @@
     return cleanCode(diver?.sh || "");
   }
   function maxDepthForEvent(e){
-    let max = parseNum(e?.mdd);
+    let max = cleanMddValue(e?.mdd, {fallback:null});
     for(const m of airMeasurements(e)){
       if(Number.isFinite(m.depth) && (!Number.isFinite(max) || m.depth > max)) max = m.depth;
     }
@@ -3699,10 +3788,10 @@
     rows.push(["Duikmonitor - tijdsregistratie duikarbeid"]);
     rows.push(["Datum", state.project.date || "", "Locatie", state.project.location || "", "Post/Ploeg", state.project.post || "", "DPL", state.project.dpl || ""]);
     rows.push([]);
-    rows.push(["#","Duiker","Rol","SH","Duikno","Toestel","Masker","Begindruk bar","Tijd in",...headers.map(h=>`${h} min`),"Drukcheck vervolg","Tijd uit","Einddruk bar","Max. diepte m","Tot. duiktijd min","Tabel-HG","Bijzonderheden"]);
+    rows.push(["#","Duiker","Seinhouder","Duikno","Toestel","Masker","Begindruk bar","Tijd in",...headers.map(h=>`${h} min`),"Drukcheck vervolg","Tijd uit","Einddruk bar","Max. diepte m","Tot. duiktijd min","Tabel-HG","Bijzonderheden"]);
     records.forEach(r=>{
       const split = splitCheckPoints(r, headers);
-      rows.push([r.nr,r.duiker,r.rol,r.seinhouder,r.duikno,r.duikset,r.masker,r.begindruk,r.tijdIn,...headers.map(h=>(split.buckets.get(h)||[]).join(" | ")),split.continuation.join(" | "),r.boven,r.einddruk,r.maxDiepte,r.dt,r.hg,r.bijzonderheden]);
+      rows.push([r.nr,r.duiker,r.seinhouder,r.duikno,r.duikset,r.masker,r.begindruk,r.tijdIn,...headers.map(h=>(split.buckets.get(h)||[]).join(" | ")),split.continuation.join(" | "),r.boven,r.einddruk,r.maxDiepte,r.dt,r.hg,r.bijzonderheden]);
     });
     rows.push([]);
     rows.push(["Berekening / DCIEM-onderbouwing"]);
@@ -3725,7 +3814,7 @@
     const diveRows = records.map(r=>{
       const split = splitCheckPoints(r, headers);
       const checkCells = headers.map(h=>`<td>${esc((split.buckets.get(h)||[]).join("; ") || "—")}</td>`).join("");
-      return `<tr><td>${r.nr}</td><td>${esc(r.duiker)}</td><td>${esc(r.rol)}</td><td>${esc(regCell(r.seinhouder))}</td><td>${esc(regCell(r.duikno))}</td><td>${esc(regCell(r.duikset))}</td><td>${esc(regCell(r.masker))}</td><td>${esc(regCell(r.begindruk))}</td><td>${esc(r.tijdIn)}</td>${checkCells}<td>${esc(split.continuation.join("; ") || "—")}</td><td>${esc(r.boven)}</td><td>${esc(regCell(r.einddruk))}</td><td>${esc(regCell(r.maxDiepte))}</td><td>${esc(r.dt)}</td><td>${esc(regCell(r.hg))}</td><td>${esc(regCell(r.bijzonderheden))}</td></tr>`;
+      return `<tr><td>${r.nr}</td><td>${esc(r.duiker)}</td><td>${esc(regCell(r.seinhouder))}</td><td>${esc(regCell(r.duikno))}</td><td>${esc(regCell(r.duikset))}</td><td>${esc(regCell(r.masker))}</td><td>${esc(regCell(r.begindruk))}</td><td>${esc(r.tijdIn)}</td>${checkCells}<td>${esc(split.continuation.join("; ") || "—")}</td><td>${esc(r.boven)}</td><td>${esc(regCell(r.einddruk))}</td><td>${esc(regCell(r.maxDiepte))}</td><td>${esc(r.dt)}</td><td>${esc(regCell(r.hg))}</td><td>${esc(regCell(r.bijzonderheden))}</td></tr>`;
     }).join("");
     const headerCells = headers.map(h=>`<th>${h} min</th>`).join("");
     const dciemRows = compactDciemRows();
@@ -3734,7 +3823,7 @@
       <div class="card span12"><h3>Daggegevens</h3><div class="tablewrap"><table class="table"><tbody><tr><th>Datum</th><td>${esc(state.project.date||'—')}</td><th>Locatie</th><td>${esc(state.project.location||'—')}</td></tr><tr><th>Post/Ploeg</th><td>${esc(state.project.post||'—')}</td><th>DPL</th><td>${esc(state.project.dpl||'—')}</td></tr></tbody></table></div></div>
       <div class="card span6"><h3>Oefencodes dagdeel 1</h3>${exerciseCodesHtml('1')}</div>
       <div class="card span6"><h3>Oefencodes dagdeel 2</h3>${exerciseCodesHtml('2')}</div>
-      <div class="card span12"><h3>Duiklog / tijdsregistratie</h3><p class="note no-print">Drukcheckkolommen zijn dynamisch: de stap is 10 min bij MDD &lt; 9 m en 5 min vanaf 9 m, en de kolommen lopen alleen door tot de laatste werkelijk gelogde drukcheck. Zonder metingen verschijnen er geen drukcheckkolommen.</p><div class="tablewrap"><table class="table"><thead><tr><th>#</th><th>Duiker</th><th>Rol</th><th>SH</th><th>Duikno</th><th>Toestel</th><th>Masker</th><th title="Begindruk (bar)">Bar in</th><th title="Tijd in">In</th>${headerCells}<th title="Tussentijdse drukchecks tijdens de duik">Drukcheck</th><th title="Tijd uit">Uit</th><th title="Einddruk (bar)">Bar uit</th><th title="Maximale duikdiepte (m)">MDD</th><th title="Totale duiktijd (min)">DT</th><th title="Tabel-herhalingsgroep (HG)">HG</th><th>Bijzonderheden</th></tr></thead><tbody>${diveRows || `<tr><td colspan="${16+headers.length}">Nog geen geregistreerde duiken.</td></tr>`}</tbody></table></div></div>
+      <div class="card span12"><h3>Duiklog / tijdsregistratie</h3><p class="note no-print">Drukcheckkolommen zijn dynamisch: de stap is 10 min bij MDD &lt; 9 m en 5 min vanaf 9 m, en de kolommen lopen alleen door tot de laatste werkelijk gelogde drukcheck. Zonder metingen verschijnen er geen drukcheckkolommen.</p><div class="tablewrap"><table class="table"><thead><tr><th>#</th><th>Duiker</th><th>Seinhouder</th><th>Duikno</th><th>Toestel</th><th>Masker</th><th title="Begindruk (bar)">Bar in</th><th title="Tijd in">In</th>${headerCells}<th title="Tussentijdse drukchecks tijdens de duik">Drukcheck</th><th title="Tijd uit">Uit</th><th title="Einddruk (bar)">Bar uit</th><th title="Maximale duikdiepte (m)">MDD</th><th title="Totale duiktijd (min)">DT</th><th title="Tabel-herhalingsgroep (HG)">HG</th><th>Bijzonderheden</th></tr></thead><tbody>${diveRows || `<tr><td colspan="${15+headers.length}">Nog geen geregistreerde duiken.</td></tr>`}</tbody></table></div></div>
       <div class="card span12"><h3><span class="notepen-static" aria-hidden="true">✎</span> Notities bij deze dag</h3><textarea aria-label="Notities bij deze dag" class="user no-print" data-day-note placeholder="Optioneel">${esc(state.project.dayNote||"")}</textarea><div class="notebox print-only">${esc(state.project.dayNote||"—")}</div></div>
       <div class="card span12"><div class="headline"><h3>Berekening / DCIEM-onderbouwing</h3><details class="info no-print"><summary title="Afkortingen" aria-label="Afkortingen">i</summary><div class="info-body"><b>MDD</b> maximale duikdiepte (m) · <b>DT</b> duiktijd (min) · <b>OI</b> oppervlakte-interval (min) · <b>HF</b> herhalingsfactor · <b>EDT</b> equivalente duiktijd = DT × HF (min) · <b>HG</b> herhalingsgroep · <b>DD</b> dagdeel · <b>SH</b> seinhouder · <b>DPL</b> duikploegleider · <b>tabel X m</b> tabeldiepte waarop is afgelezen</div></details></div><div class="tablewrap"><table class="table"><thead><tr><th>#</th><th>Duiker</th><th>Berekening</th></tr></thead><tbody>${dciemRows || '<tr><td colspan="3">Nog geen berekening.</td></tr>'}</tbody></table></div></div>
       ${records.length ? `<div class="card span12 no-print"><details class="fold"><summary>Controlebijlage (niet in print)</summary><div class="fold-body"><h3>Tijdlijn watermomenten</h3>${v118TimelineHtml()}</div></details></div>` : ''}
@@ -3941,8 +4030,8 @@
   function renderSettings(){
     document.getElementById("settingsScreen").innerHTML = `<div class="grid">
       <div class="card span12"><div class="headline"><h2>Instellingen</h2><details class="info no-print"><summary title="Uitleg Instellingen" aria-label="Uitleg Instellingen">i</summary><div class="info-body">Gebruik bij voorkeur vaste duikercodes en neutrale aanduidingen. Vrije aanduidingen, DPL en notities kunnen persoonsgegevens bevatten; deel die niet via GitHub of voorbeeldbestanden. Beheer en controle staan bovenaan; daaronder staan de standaard duikcodes en materiaalgegevens. Het schermthema (Nacht of Dag) staat rechtsboven in de balk. Nacht is donker voor bus en duisternis; Dag is licht met hoog contrast voor zon en waterkant. Bij openen kiest de app zelf op basis van de klok tussen nacht en dag; een eigen keuze blijft daarna staan. De knop Auto hieronder zet dat terug naar automatisch.</div></details></div><details class="fold no-print"><summary>Beheer en controle</summary><div class="fold-body"><div class="btnrow"><button class="bad" id="resetAll">Alles wissen</button><button class="primary" id="settingsSelftest">Zelftest openen</button></div><div class="soundbox compact"><div class="fieldrow"><div class="f4"><label>Drukcheck-geluid</label><select aria-label="Drukcheck-geluid" class="user" id="airSoundEnabled"><option value="off" ${state.settings?.airSoundEnabled?'':'selected'}>Uit</option><option value="on" ${state.settings?.airSoundEnabled?'selected':''}>Aan</option></select></div><div class="f4"><label>&nbsp;</label><button class="mini ghost" id="testAirSound">Test piep</button></div><div class="f4"><label>Schermthema</label><button class="mini ghost" id="themeAuto" title="Zet thema terug op automatisch (klok)">Auto (klok)</button></div></div></div></div></details></div>
-      <div class="card span12"><div class="headline"><h3>Over deze tool</h3></div><p class="note">De Duikmonitor is een praktisch hulpmiddel voor aan de waterkant. Veel kun je vooraf regelen: plannen, opschrijven, oefenen. Tijdens een echte inzet gaat de registratie echter vaak nog met de hand. Deze app is bedoeld om te laten zien dat het ook eenvoudiger kan: een paar knoppen, en de duik staat geregistreerd, met de berekeningen en regels er al in.</p><p class="note">Het is een open voorbeeld, geen eindantwoord. De app is open source. Probeer hem uit, kijk of de berekeningen kloppen, en geef aan wat beter kan. Zie je iets, dan kijken we samen. Gebruik hem voor jezelf, pas hem aan voor je eigen regio, of bouw mee. Het gaat niet om deze app, maar om of het beter en veiliger kan.</p><div class="hint">De tabellen en regels horen voor operationeel gebruik door het juiste gezag bevestigd te worden.</div></div><div class="card span12 no-print"><div class="headline"><h3>Meedenken en melden</h3><details class="info no-print"><summary title="Uitleg Meedenken" aria-label="Uitleg Meedenken">i</summary><div class="info-body">Gebruik GitHub voor reproduceerbare fouten en concrete verbeterideeën. Zet daar geen echte namen, telefoonnummers, e-mailadressen, locaties of operationele persoonsgegevens in. Gebruik fictieve voorbeelden zoals Duiker 1.</div></details></div><p class="note">De publieke app staat op duikmonitor.app. De broncode, documentatie en meldroute staan op GitHub.</p><div class="btnrow"><a class="buttonlink primary" href="${PUBLIC_APP_URL}" target="_blank" rel="noopener noreferrer">Website openen</a><a class="buttonlink ghost" href="${REPO_URL}" target="_blank" rel="noopener noreferrer">Broncode bekijken</a><a class="buttonlink ghost" href="${ISSUE_URL}" target="_blank" rel="noopener noreferrer">Probleem of idee melden</a><a class="buttonlink ghost" href="${SECURITY_URL}" target="_blank" rel="noopener noreferrer">Security-route</a></div><div class="hint">Meld beveiligingsproblemen niet openbaar in Issues. Deel exports alleen bewust; de app bewaart gegevens lokaal in deze browser.</div></div>
-      <div class="card span12"><div class="headline"><h3>Duikers</h3><details class="info no-print"><summary title="Uitleg Duikers" aria-label="Uitleg Duikers">i</summary><div class="info-body">Na Alles wissen staat de monitor weer schoon met vaste duikers D1 t/m D12 en MDD 6 m. Vink Actief uit om een duikerslot tijdelijk uit planning, live bediening en overzichten te halen. Duiker is de vaste code; Aanduiding is vrij en optioneel. SH is de seinhouder voor deze duiker; de duikploegleider staat bij de daggegevens. Set # en Masker # worden bij Start duik gekopieerd naar de duikregistratie.</div></details></div><div class="btnrow no-print"><button class="ghost" id="depthAllToggle" title="Zet de standaard-MDD van alle duikers in één keer">Diepte voor allen…</button><span id="depthAllPanel" style="display:none;align-items:center;gap:6px"><input aria-label="Standaard-MDD voor alle duikers" class="user" type="number" inputmode="numeric" step="1" min="0" max="15" id="depthAllValue" placeholder="m" style="max-width:80px"><button class="primary mini" id="depthAllApply">Toepassen</button></span></div><div class="tablewrap"><table class="table"><thead><tr><th>Actief</th><th>Duiker</th><th>Aanduiding</th><th>SH</th><th>MDD</th><th>Set #</th><th>Masker #</th></tr></thead><tbody>${state.divers.map(d=>`<tr><td><input type="checkbox" data-diver-active="${esc(d.id)}" ${isDiverActive(d)?'checked':''} aria-label="${esc(diverCode(d))} actief"></td><td class="mono"><strong>${esc(diverCode(d))}</strong></td><td><input aria-label="Aanduiding ${esc(diverCode(d))}" class="user" data-diver-label="${esc(d.id)}" value="${esc(cleanLabel(d.label))}" placeholder="bijv. kandidaat, INS1, OD"></td><td><input aria-label="SH ${esc(diverCode(d))}" class="user" maxlength="8" data-diver-sh="${esc(d.id)}" value="${esc(d.sh||'')}" placeholder="–"></td><td><input aria-label="MDD ${esc(diverCode(d))}" class="user" type="text" inputmode="decimal" data-diver-mdd="${esc(d.id)}" value="${esc(d.defaultMdd||6)}"></td><td><input aria-label="Set ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-set="${esc(d.id)}" value="${esc(d.setNo||'')}" placeholder="–"></td><td><input aria-label="Masker ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-mask="${esc(d.id)}" value="${esc(d.maskNo||'')}" placeholder="–"></td></tr>`).join("")}</tbody></table></div><p class="small muted">D1 t/m D12 zijn vaste duikercodes en worden niet automatisch hernummerd. Gebruik Aanduiding alleen voor een rol of neutrale herkenning. Gebruik geen echte namen als je exports of voorbeelden deelt.</p></div>
+      <div class="card span12"><details class="fold"><summary aria-label="Over deze tool openen of sluiten">Over deze tool</summary><div class="fold-body"><p class="note">De Duikmonitor is een praktisch hulpmiddel voor aan de waterkant. Veel kun je vooraf regelen: plannen, opschrijven, oefenen. Tijdens een echte inzet gaat de registratie echter vaak nog met de hand. Deze app is bedoeld om te laten zien dat het ook eenvoudiger kan: een paar knoppen, en de duik staat geregistreerd, met de berekeningen en regels er al in.</p><p class="note">Het is een open voorbeeld, geen eindantwoord. De app is open source. Probeer hem uit, kijk of de berekeningen kloppen, en geef aan wat beter kan. Zie je iets, dan kijken we samen. Gebruik hem voor jezelf, pas hem aan voor je eigen regio, of bouw mee. Het gaat niet om deze app, maar om of het beter en veiliger kan.</p><div class="hint">De tabellen en regels horen voor operationeel gebruik door het juiste gezag bevestigd te worden.</div></div></details></div><div class="card span12 no-print"><div class="headline"><h3>Meedenken en melden</h3><details class="info no-print"><summary title="Uitleg Meedenken" aria-label="Uitleg Meedenken">i</summary><div class="info-body">Gebruik GitHub voor reproduceerbare fouten en concrete verbeterideeën. Zet daar geen echte namen, telefoonnummers, e-mailadressen, locaties of operationele persoonsgegevens in. Gebruik fictieve voorbeelden zoals Duiker 1.</div></details></div><p class="note">De publieke app staat op duikmonitor.app. De broncode, documentatie en meldroute staan op GitHub.</p><div class="btnrow"><a class="buttonlink primary" href="${PUBLIC_APP_URL}" target="_blank" rel="noopener noreferrer">Website openen</a><a class="buttonlink ghost" href="${REPO_URL}" target="_blank" rel="noopener noreferrer">Broncode bekijken</a><a class="buttonlink ghost" href="${ISSUE_URL}" target="_blank" rel="noopener noreferrer">Probleem of idee melden</a><a class="buttonlink ghost" href="${SECURITY_URL}" target="_blank" rel="noopener noreferrer">Security-route</a></div><div class="hint">Meld beveiligingsproblemen niet openbaar in Issues. Deel exports alleen bewust; de app bewaart gegevens lokaal in deze browser.</div></div>
+      <div class="card span12"><div class="headline"><h3>Duikers</h3><details class="info no-print"><summary title="Uitleg Duikers" aria-label="Uitleg Duikers">i</summary><div class="info-body">Na Alles wissen staat de monitor weer schoon met vaste duikers D1 t/m D12 en MDD 6 m. Vink Actief uit om een duikerslot tijdelijk uit planning, live bediening en overzichten te halen. Duiker is de vaste code; Aanduiding is vrij en optioneel. Seinhouder is de seinhouder voor deze duiker; de duikploegleider staat bij de daggegevens. Set # en Masker # worden bij Start duik gekopieerd naar de duikregistratie.</div></details></div><div class="btnrow no-print"><button class="ghost" id="depthAllToggle" title="Zet de standaard-MDD van alle duikers in één keer">Diepte voor allen…</button><span id="depthAllPanel" style="display:none;align-items:center;gap:6px"><input aria-label="Standaard-MDD voor alle duikers" class="user" type="number" inputmode="numeric" step="1" min="0" max="15" id="depthAllValue" placeholder="m" style="max-width:80px"><button class="primary mini" id="depthAllApply">Toepassen</button></span></div><div class="tablewrap"><table class="table"><thead><tr><th>Actief</th><th>Duiker</th><th>Aanduiding</th><th>Seinhouder</th><th>MDD</th><th>Set #</th><th>Masker #</th></tr></thead><tbody>${state.divers.map(d=>`<tr><td><input type="checkbox" data-diver-active="${esc(d.id)}" ${isDiverActive(d)?'checked':''} aria-label="${esc(diverCode(d))} actief"></td><td class="mono"><strong>${esc(diverCode(d))}</strong></td><td><input aria-label="Aanduiding ${esc(diverCode(d))}" class="user" data-diver-label="${esc(d.id)}" maxlength="8" value="${esc(cleanDiverLabel(d.label))}" placeholder="bijv. K01, INS1"></td><td><input aria-label="Seinhouder ${esc(diverCode(d))}" class="user" maxlength="8" data-diver-sh="${esc(d.id)}" value="${esc(d.sh||'')}" placeholder="–"></td><td><input aria-label="MDD ${esc(diverCode(d))}" class="user" type="text" inputmode="decimal" data-diver-mdd="${esc(d.id)}" value="${esc(d.defaultMdd||6)}"></td><td><input aria-label="Set ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-set="${esc(d.id)}" value="${esc(d.setNo||'')}" placeholder="–"></td><td><input aria-label="Masker ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-mask="${esc(d.id)}" value="${esc(d.maskNo||'')}" placeholder="–"></td></tr>`).join("")}</tbody></table></div><p class="small muted">D1 t/m D12 zijn vaste duikercodes en worden niet automatisch hernummerd. Gebruik Aanduiding alleen voor een rol of neutrale herkenning. Gebruik geen echte namen als je exports of voorbeelden deelt.</p></div>
       <div class="card span12"><details class="fold" data-expand-all-details="true"><summary>Rekenregels</summary><div class="fold-body"><div class="warnbox"><b>Hulpmiddel.</b> Deze app ondersteunt planning, controle en registratie. De app vervangt geen formele werkinstructie, papieren tabel, duikcomputer, duikploegleider, LMRA, werkplan, medisch advies of regionaal beleid.</div><div class="hint"><b>Bron DCIEM-tabellen:</b> IWOD 002 Decompressiemethoden (1 april 2019) § 2300 luchttabel 1.</div><div class="hint" style="margin-top:8px"><b>HF voor groep B bij OI 2:00–2:59:</b> de monitor gebruikt 1,2. Dat is de waarde van de canonieke DCIEM-bron, bevestigd door de IWOD 002 (2019) en het DCIEM-origineel (1992). De Landelijke Werkinstructie WOD v2.0 vermeldt op deze ene cel 1,1; dat wijkt af van alle andere bronnen en van het monotone tabelpatroon en is vrijwel zeker een overschrijffout in de WOD. De monitor volgt de bronwaarde 1,2 en neemt de afwijking niet over. Terzijde: 1,2 is ook de strengere van de twee, want een hogere HF geeft een langere EDT, dus de monitor staat hiermee aan de veilige kant.</div><div class="fieldrow" style="margin-top:12px"><div class="f6"><h3>Controle en verificatie</h3><p class="note">De berekeningen zijn controleerbaar via de broncode in de repository, vaste testgevallen en de ingebouwde zelftest. Gebruik de zelftest om de rekenregels op dit toestel opnieuw te controleren.</p><div class="hint">Bij een release horen appversie, bronprofiel en controlegetal, zodat later duidelijk is welke versie is gebruikt.</div></div><div class="f6"><h3>Kernregels ingebouwd</h3><ul class="messages"><li>No-deco tot maximaal 15 m.</li><li>MDD wordt afgerond naar tabeldiepte 6/9/12/15 m.</li><li>Airtabel 1 bepaalt HG.</li><li>Tabel 4a bepaalt HF op basis van HG en OI.</li><li>Tabel 4b bepaalt herhalings-NDL.</li><li>EDT = DT × HF, conservatief afgerond naar boven.</li><li>6-, 9- en 12-meterregel wordt alleen als toegepast getoond wanneer duikmomenten van dezelfde duiker worden opgeteld.</li><li>Dagdeel 1 en Dagdeel 2 worden gescheiden berekend.</li></ul></div><div class="f6"><h3>Dagdeel en meterregel</h3><p class="note">Bij een losse duik toont de monitor Tabel 1 met de juiste tabeldiepte. Pas wanneer duikmomenten van dezelfde duiker binnen hetzelfde dagdeel worden samengenomen, toont de monitor 6-, 9- of 12-meterregel toegepast; daarbij gebruikt de monitor de hoogste MDD en telt hij de duiktijden op voor één HG.</p><div class="hint">Eén losse duik t/m 6/9/12 m = Tabel 1 met tabeldiepte 6/9/12 m. Meerdere duikmomenten van dezelfde duiker die worden opgeteld = 6-/9-/12-meterregel toegepast. Duiken van verschillende duikers worden nooit samengevoegd.</div><div class="hint" style="margin-top:8px"><b>Periodebewaking:</b> als duikmomenten over twee dagdelen vallen zonder rustpauze van minimaal 1 uur ertussen, telt de monitor de duiktijden alsnog op tijdsbasis op en waarschuwt bij overschrijding van de meterregellimiet. Controleer dan of het operationeel echt om twee dagdelen gaat.</div></div><div class="f6"><h3>Dieper dan 12 m</h3><p class="note">De monitor geeft nu een aparte procedurehint bij geplande en niet-geplande situaties boven 12 m.</p><div class="hint">${esc(over12PlannedGuidance)}</div><div class="warnbox" style="margin-top:10px"><b>Niet-geplande overschrijding, alleen als ook de 3-duikenlimiet is overschreden:</b> ${esc(over12UnplannedProcedure)}</div></div><div class="f12"><h3>Opstijgingen en rust</h3><p class="note">Opstijgingen worden per duiker bewaakt per duikperiode van 4 uur en per duikdag. Tussen twee opstijgingen geldt minimaal 15 minuten oppervlakte-interval. Na een duikperiode van 4 uur geldt minimaal 1 uur rust.</p><div class="tablewrap"><table class="table"><thead><tr><th>Maximale diepte</th><th>Per 4 uur</th><th>Per dag</th><th>Bronlaag</th></tr></thead><tbody><tr><td>t/m 6 m</td><td>6</td><td>12</td><td>DMC-advies 2013</td></tr><tr><td>&gt;6 t/m 9 m</td><td>4</td><td>8</td><td>DMC-advies 2013</td></tr><tr><td>&gt;9 t/m 12 m</td><td>3</td><td>6</td><td>Conservatieve projectregel</td></tr><tr><td>&gt;12 t/m 15 m</td><td>3</td><td>3</td><td>WOD-regime / projectmatige borging</td></tr></tbody></table></div><div class="hint" style="margin-top:10px"><b>Waarom extra?</b> De meterregel vereenvoudigt DCIEM-planning voor meerdere ondiepe duikmomenten. Die vereenvoudiging is geen toestemming voor onbeperkt herhaald opstijgen; daarom bewaakt de monitor ook de opstijgingsaantallen.</div><p class="small muted">DMC noemt 6 m en 9 m expliciet. De diepere categorieën zijn conservatief/projectmatig geborgd; de meest beperkende grens is leidend.</p></div><div class="f6"><h3>Opkomstvenster</h3><p class="note">Gebaseerd op 18 ± 3 meter per minuut. Live-metingen worden op seconden gecontroleerd.</p><div class="hint">Te snel, niet geregistreerd of afwijkend opkomen geeft een controlehint in de hoofdstatus.</div></div><div class="f6"><h3>Ademluchtbewaking</h3><p class="note">Actieve duiken kunnen tussentijds luchtmetingen vastleggen. De monitor gebruikt standaard 2×4 L, rekent resterende tijd tot 100 bar en kiest automatisch het juiste drukcheck-interval.</p><div class="hint">Ademluchtbewaking is een operationele controlelaag, geen DCIEM-tabelbron.</div></div><div class="f12"><h3>Privacy en lokaal gebruik</h3><p class="note">De monitor rekent in de browser op dit apparaat. Ingevoerde gegevens worden niet automatisch naar een server verzonden.</p><p class="note">Er is geen account, geen centrale database en geen automatische synchronisatie. Gegevens blijven lokaal in de browser, tenzij de gebruiker ze zelf exporteert, print, kopieert of deelt.</p><div class="hint">De appbestanden kunnen via duikmonitor.app of als lokaal bestand worden geopend. Ingevulde duikgegevens en berekeningen worden door de app niet naar GitHub, de beheerder of een eigen server verzonden. Bij het openen van een openbare website kan de hostinglaag wel normale technische requestgegevens ontvangen; dat staat los van de lokale appdata.</div></div></div></div></details></div>
       <div class="card span12"><details class="fold"><summary>Voorbeelden laden</summary><div class="fold-body"><div class="headline"><h3>Voorbeeld laden</h3><details class="info no-print"><summary title="Uitleg Voorbeelden" aria-label="Uitleg Voorbeelden">i</summary><div class="info-body">Voorbeelden zijn fictieve demo-gegevens met alleen codes. Ze zijn bedoeld om de app, meldingen, registratie en export te bekijken. Laden vervangt de huidige gegevens. De zelftest is iets anders: die controleert automatisch de rekenregels met vaste verwachte uitkomsten en schrijft niets weg in je echte planning of dagregistratie.</div></details></div><div class="fieldrow">
         ${v118ExampleCard(1,"Gecombineerde duiken","RD/ResD en gecombineerde duiken met meerdere combinaties.")}
@@ -3959,12 +4048,12 @@
       </div></div></details></div>
     </div>`;
     document.querySelectorAll("[data-diver-active]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverActive); if(d){ if(!inp.checked && latestActiveDive(d.id)){ alert("Deze duiker heeft nog een actieve duik. Sluit die eerst af voordat je de duiker inactief zet."); d.active=true; } else d.active=!!inp.checked; }}));
-    document.querySelectorAll("[data-diver-label]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverLabel); if(d)d.label=cleanLabel(inp.value);}));
-    document.querySelectorAll("[data-diver-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverMdd); if(d){ let v=parseNum(inp.value)||6; if(v>15){ v=15; alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); } d.defaultMdd=v; }}));
-    document.querySelectorAll("[data-diver-sh]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverSh); if(d)d.sh=cleanCode(inp.value);}));
+    document.querySelectorAll("[data-diver-label]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverLabel); if(d)d.label=cleanDiverLabel(inp.value);}));
+    document.querySelectorAll("[data-diver-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverMdd); if(d){ const raw=parseNum(inp.value); let v=cleanMddValue(inp.value,{clamp:true,fallback:6}); if(Number.isFinite(raw) && raw>MAX_MDD){ alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); } d.defaultMdd=v; inp.value=v; }}));
+    document.querySelectorAll("[data-diver-sh]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverSh); if(d)d.sh=cleanSignalHolder(inp.value);}));
     const depthToggle=document.getElementById("depthAllToggle"), depthPanel=document.getElementById("depthAllPanel"), depthApply=document.getElementById("depthAllApply"), depthValue=document.getElementById("depthAllValue");
     if(depthToggle && depthPanel){ depthToggle.onclick=()=>{ depthPanel.style.display = depthPanel.style.display==="none" ? "inline-flex" : "none"; if(depthPanel.style.display!=="none") depthValue?.focus(); }; }
-    if(depthApply){ depthApply.onclick=()=>{ let v=parseNum(depthValue?.value); if(v==null||v<=0){ alert("Vul een diepte in meters in."); depthValue?.focus(); return; } if(v>15){ v=15; alert("Maximale duikdiepte is 15 m. De waarde is teruggezet naar 15."); } if(!confirm(`Standaard-MDD van alle duikers op ${v} m zetten?`)) return; mutate(()=>{ state.divers.forEach(d=>d.defaultMdd=v); }); }; }
+    if(depthApply){ depthApply.onclick=()=>{ let v=parseNum(depthValue?.value); if(v==null||v<=0){ alert("Vul een diepte in meters in."); depthValue?.focus(); return; } if(v>MAX_MDD){ v=MAX_MDD; alert("Maximale duikdiepte is 15 m. De waarde is teruggezet naar 15."); } if(!confirm(`Standaard-MDD van alle duikers op ${v} m zetten?`)) return; mutate(()=>{ state.divers.forEach(d=>d.defaultMdd=v); }); }; }
     document.querySelectorAll("[data-diver-set]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverSet); if(d)d.setNo=cleanMaterial(inp.value);}));
     document.querySelectorAll("[data-diver-mask]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverMask); if(d)d.maskNo=cleanMaterial(inp.value);}));
     document.getElementById("resetAll").onclick=()=>{ if(confirm("Alle lokale gegevens wissen en terug naar standaard codes D1 t/m D12 en MDD 6 m?")) mutate(resetAllData); };
@@ -4055,8 +4144,8 @@
     ensureProjectMeta();
     ensureDivers();
     const validDiverIds = new Set(state.divers.map(d=>d.id));
-    const cleanBar = v => { const n = validBar(v); return n == null ? "" : Math.round(n); };
-    const cleanAirDepth = v => { const n = parseNum(v); return Number.isFinite(n) && n >= 0 && n <= 60 ? Math.round(n*10)/10 : ""; };
+    const cleanBar = cleanBarValue;
+    const cleanAirDepth = v => cleanAirDepthValue(v);
     let droppedUnknownDiver = 0, cleanedBars = 0;
     for(const listName of ["planning","live"]){
       // Regels met een onbekende duiker-id niet stilzwijgend naar D1 schuiven, maar
@@ -4066,11 +4155,12 @@
       droppedUnknownDiver += before - state[listName].length;
       for(const d of state[listName]){
         d.notes = String(d.notes ?? "").slice(0,500);
-        d.signalHolder = cleanCode(d.signalHolder);
+        d.signalHolder = cleanSignalHolder(d.signalHolder);
         d.role = cleanRole(d.role);
         d.setNo = cleanMaterial(d.setNo);
         d.maskNo = cleanMaterial(d.maskNo);
-        // Ongeldige barwaarden (leeg, negatief, > 400) fysiek opschonen, zodat ze niet
+        d.mdd = cleanMddValue(d.mdd, {fallback:""});
+        // Ongeldige barwaarden (leeg, negatief, > 330) fysiek opschonen, zodat ze niet
         // als "ingevuld maar ongeldig" in UI of export blijven rondzwerven.
         for(const f of ["airStartBar","airEndBar"]){
           if(d[f] !== undefined && d[f] !== "" && d[f] !== null){ const c = cleanBar(d[f]); if(String(c) !== String(d[f])) cleanedBars++; d[f] = c; }

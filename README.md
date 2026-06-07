@@ -13,7 +13,7 @@ Een eenvoudige, **offline-first** webapplicatie om duiken te plannen, live te mo
 
 ## Status
 
-Actuele publicatieversie: **v1.0.0**. Dit is de eerste publieke release.
+Actuele publicatieversie: **v1.1.0**. v1.0.0 was de eerste publieke release.
 
 De app plant, monitort en registreert duiken met een gevalideerde DCIEM-rekenmotor tot en met 15 meter, binnen de gedocumenteerde no-deco scope. Ze maakt expliciet onderscheid tussen een losse duik in tabeldiepte 6, 9 of 12 m en een toegepaste 6-, 9- of 12-meterregel waarbij meerdere duikmomenten van dezelfde duiker worden opgeteld. Het duikerbeheer werkt met vaste slots D1 tot en met D12. Alle DCIEM-tabelwaarden zijn cel voor cel tegen de bron gecontroleerd. Bij elke start bewaakt de ingebouwde zelftest zowel de afgeleide rekenmotor als een vaste bronfingerprint/fixture, zodat ook een onbedoelde wijziging in de ingebouwde bron opvalt.
 
@@ -86,6 +86,7 @@ Gebruik `https://github.com/streuper/duikmonitor/issues/new/choose` voor reprodu
 | `index.html` | De volledige applicatie. |
 | `VERHAAL.md` | Het waarom, en wat de app wel en niet doet. |
 | `CHANGELOG.md` | Noemenswaardige wijzigingen per release. |
+| `RELEASE_NOTES_v1.1.0.md` | Release-notitie voor v1.1.0. |
 | `RELEASE_NOTES_v1.0.0.md` | Release-notitie voor v1.0.0, de eerste publieke release. |
 | `CHECKSUMS.sha256` | Controlegetal van `index.html` voor deze release. |
 | `SECURITY.md` | Privacy, gegevensverwerking en beveiligingsmelding. |
