@@ -2,6 +2,24 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.1.0] - 2026-06-07
+
+Release-afronding van de registratie- en instellingenwijziging.
+
+### Gewijzigd
+
+- Registratie- en logweergave rustiger gemaakt: administratieve kloktijden worden zonder seconden getoond.
+- Live seconden, live timers, opkomstcontrole en drukcheck-aftelling behouden.
+- Hoofdduiklog opgeschoond: geen aparte kolom Rol; rol-informatie blijft waar relevant zichtbaar in Bijzonderheden.
+- Duikerweergave blijft herkenbaar als `D1 · AANDUIDING`.
+- Veldlimieten aangescherpt voor daggegevens, aanduiding, seinhouder, materiaalnummers, drukwaarden en MDD/maxdiepte.
+- “Over deze tool” in Instellingen standaard ingeklapt.
+- Aanvullende zelftests toegevoegd/aangepast.
+
+### Niet gewijzigd
+
+- DCIEM-tabellen, meterregels, boot-gate, CSP en netwerkgedrag zijn inhoudelijk niet gewijzigd.
+
 ## [1.0.0] - 2026-06-03
 
 Eerste publieke release.
