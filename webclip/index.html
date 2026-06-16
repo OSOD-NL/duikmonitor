@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duikmonitor installeren</title>
+<style>
+  :root{
+    --accent:#ff5638;
+    --ink:#10151a;
+    --card:#ffffff;
+    --text:#1d242b;
+    --muted:#6c7682;
+    --line:#e9ebee;
+    --panel:#f4f6f8;
+    --warn-bg:#fdeae2;
+    --warn-line:#f6c3b2;
+    --warn-text:#90391f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(180deg,#12171d 0%,#0c1014 100%);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px 16px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .card{
+    width:100%;
+    max-width:430px;
+    background:var(--card);
+    border-radius:22px;
+    box-shadow:0 24px 60px rgba(0,0,0,.35);
+    padding:30px 26px 22px;
+  }
+  .tag{
+    display:inline-block;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.14em;
+    color:var(--muted);
+    text-transform:uppercase;
+    text-decoration:none;
+  }
+  a.tag:hover{color:var(--text)}
+  .icon{
+    width:84px;height:84px;
+    border-radius:20px;
+    overflow:hidden;
+    margin:14px auto 16px;
+    box-shadow:0 6px 18px rgba(16,21,26,.28);
+  }
+  .icon svg{display:block;width:100%;height:100%}
+  h1{
+    text-align:center;
+    font-size:27px;
+    font-weight:650;
+    letter-spacing:-.01em;
+    margin:0 0 4px;
+  }
+  .lead{
+    text-align:center;
+    color:var(--muted);
+    font-size:15px;
+    margin:0 0 22px;
+  }
+  .install{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    width:100%;
+    background:var(--accent);
+    color:#fff;
+    text-decoration:none;
+    font-size:16px;
+    font-weight:650;
+    padding:15px 18px;
+    border-radius:13px;
+    transition:transform .08s ease, filter .15s ease;
+  }
+  .install:hover{filter:brightness(1.05)}
+  .install:active{transform:translateY(1px)}
+  .install:focus-visible{outline:3px solid #ffb8a6;outline-offset:2px}
+  .install svg{width:19px;height:19px;flex:none}
+  .safari{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    color:var(--muted);
+    font-size:13px;
+    margin:12px 0 0;
+    text-align:center;
+  }
+  .safari svg{width:15px;height:15px;flex:none;opacity:.8}
+  .rule{
+    display:flex;align-items:center;gap:10px;
+    margin:22px 0 18px;
+  }
+  .rule .line{height:1px;background:var(--line);flex:1}
+  h2{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+  ol.steps{list-style:none;margin:0;padding:0}
+  ol.steps li{display:flex;gap:13px;margin-bottom:15px;font-size:15px;line-height:1.5}
+  ol.steps li:last-child{margin-bottom:0}
+  .n{
+    flex:none;
+    width:24px;height:24px;
+    border-radius:50%;
+    background:#fff1ed;
+    color:var(--accent);
+    font-size:13px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    margin-top:1px;
+  }
+  .info{
+    background:var(--panel);
+    border-radius:14px;
+    padding:16px 16px 4px;
+    margin:22px 0 0;
+  }
+  .info h3{font-size:14px;font-weight:650;margin:0 0 6px}
+  .info p{font-size:13.5px;line-height:1.55;color:#3d4651;margin:0 0 14px}
+  .warn{
+    display:flex;gap:11px;
+    background:var(--warn-bg);
+    border:1px solid var(--warn-line);
+    border-radius:14px;
+    padding:14px 15px;
+    margin:14px 0 0;
+  }
+  .warn .bang{
+    flex:none;width:20px;height:20px;border-radius:50%;
+    background:var(--accent);color:#fff;
+    font-size:13px;font-weight:800;line-height:20px;text-align:center;
+    margin-top:1px;
+  }
+  .warn p{margin:0;font-size:13.5px;line-height:1.5;color:var(--warn-text)}
+  .warn a{color:var(--warn-text);font-weight:650;text-decoration:underline}
+  .foot{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin-top:20px;padding-top:16px;border-top:1px solid var(--line);
+  }
+  .foot span,.foot a{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);text-decoration:none}
+  .foot a:hover{color:var(--text)}
+  .foot svg{width:15px;height:15px;flex:none;opacity:.85}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+  <main class="card">
+    <a class="tag" href="https://github.com/OSOD-NL">OSOD-NL</a>
+
+    <div class="icon">
+      <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Duikmonitor">
+        <rect width="1024" height="1024" fill="#10151a"/>
+        <line x1="160" y1="360" x2="875" y2="360" stroke="#ff5638" stroke-width="13" stroke-linecap="round" opacity="0.7"/>
+        <circle cx="235" cy="360" r="20" fill="#ff5638"/>
+        <path d="M 235 360 L 360 705 L 545 705 L 645 545 L 800 545 L 860 360" fill="none" stroke="#ff5638" stroke-width="70" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <h1>Duikmonitor</h1>
+    <p class="lead">Zet de app als icoon op je beginscherm.</p>
+
+    <!-- Pad naar het ondertekende profiel in dezelfde /webclip-map.
+         Heet je profielbestand anders, pas dan alleen deze regel aan. -->
+    <a class="install" href="/webclip/Duikmonitor.signed.mobileconfig">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/>
+      </svg>
+      Installeer Duikmonitor
+    </a>
+
+    <p class="safari">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/><path d="m15 9-4 1-1 4 4-1 1-4z"/>
+      </svg>
+      Werkt alleen in Safari. Zie je dit in een andere app, open de pagina dan in Safari.
+    </p>
+
+    <div class="rule"><span class="line"></span></div>
+
+    <h2>Zo installeer je het</h2>
+    <ol class="steps">
+      <li><span class="n">1</span><span>Tik op de knop hierboven. iOS vraagt of het profiel gedownload mag worden. Kies <b>Toestaan</b>.</span></li>
+      <li><span class="n">2</span><span>Open <b>Instellingen</b>. Het gedownloade profiel staat bovenin bij <b>Profiel gedownload</b>, of onder <b>Meer voor je iPhone</b>. Tik erop.</span></li>
+      <li><span class="n">3</span><span>Je ziet <b>Duikmonitor</b>, ondertekend door <b>OSOD-NL</b>, met de melding <b>Niet geverifieerd</b>. Dat hoort zo (zie hieronder). Tik op <b>Installeer</b> en voer je toegangscode in.</span></li>
+      <li><span class="n">4</span><span>Klaar. Het Duikmonitor-icoon staat op je beginscherm.</span></li>
+    </ol>
+
+    <div class="info">
+      <h3>Wat dit is, en wat niet</h3>
+      <p>Het profiel voegt alleen een snelkoppeling naar duikmonitor.nl toe aan je beginscherm. Geen VPN, geen netwerkfilter, geen apparaatbeheer, en geen toegang tot je gegevens of je locatie. Je kunt het op elk moment verwijderen via Instellingen.</p>
+      <h3>Over "Niet geverifieerd"</h3>
+      <p>Het profiel is door OSOD-NL zelf ondertekend, niet door Apple. Daarom toont iOS de melding "Niet geverifieerd". Dat betekent niet dat het onveilig is. Het betekent alleen dat de ondertekenaar geen door Apple uitgegeven certificaat gebruikt. Wil je het zeker weten, controleer dan de bron.</p>
+    </div>
+
+    <div class="warn">
+      <span class="bang">!</span>
+      <p>Zie je iets anders dan hierboven, zoals een VPN, een netwerkfilter, apparaatbeheer of een andere ondertekenaar dan OSOD-NL? Installeer dan niet en <a href="https://github.com/OSOD-NL/duikmonitor-webclip/issues">meld het op GitHub</a>.</p>
+    </div>
+
+    <div class="foot">
+      <span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/>
+        </svg>
+        Verwijderen kan altijd
+      </span>
+      <!-- LET OP: deze link werkt zodra de repo publiek staat -->
+      <a href="https://github.com/OSOD-NL/duikmonitor-webclip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m9 8-5 4 5 4"/><path d="m15 8 5 4-5 4"/>
+        </svg>
+        Controleer de bron
+      </a>
+    </div>
+  </main>
+</body>
+</html>
