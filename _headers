@@ -6,3 +6,7 @@
   Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
+  Cache-Control: no-cache
+
+/webclip/Duikmonitor.signed.mobileconfig
+  Content-Type: application/x-apple-aspen-config
