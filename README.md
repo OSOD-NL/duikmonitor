@@ -13,7 +13,7 @@ Een eenvoudige, **offline-first** webapplicatie om duiken te plannen, live te mo
 
 ## Status
 
-Actuele publicatieversie: **v1.1.0**. v1.0.0 was de eerste publieke release.
+Actuele publicatieversie: **v1.3.0**. v1.0.0 was de eerste publieke release.
 
 De app plant, monitort en registreert duiken met een gevalideerde DCIEM-rekenmotor tot en met 15 meter, binnen de gedocumenteerde no-deco scope. Ze maakt expliciet onderscheid tussen een losse duik in tabeldiepte 6, 9 of 12 m en een toegepaste 6-, 9- of 12-meterregel waarbij meerdere duikmomenten van dezelfde duiker worden opgeteld. Het duikerbeheer werkt met vaste slots D1 tot en met D12. Alle DCIEM-tabelwaarden zijn cel voor cel tegen de bron gecontroleerd. Bij elke start bewaakt de ingebouwde zelftest zowel de afgeleide rekenmotor als een vaste bronfingerprint/fixture, zodat ook een onbedoelde wijziging in de ingebouwde bron opvalt.
 
@@ -63,6 +63,14 @@ De DCIEM-tabelwaarden en kernregels zijn cel voor cel gedocumenteerd in `docs/VA
 
 Zie `docs/ARCHITECTUUR.md` voor de opbouw van de app, de safety-kritieke functies, de tabelwaarden, de zelftestdekking en de ontwerpgrenzen.
 
+## OSOD-uitwisseling
+
+Duikmonitor v1.3.0 implementeert OSOD v0.1, niveau S+R, binnen scope: afgeronde operationele ademluchtduiken die door de Duikmonitor-registratielaag volledig en betekenisbehoudend worden gedragen. Buiten de rekenkundige envelop worden feiten geregistreerd en wordt geen geldige rekenuitkomst geleverd; zulke records vallen niet onder een geslaagde Niveau R-berekening.
+
+OSOD-import is beperkt tot records binnen de Duikmonitor-scope. Records buiten scope worden geweigerd en niet herschreven.
+
+Vanaf v1.2.0 legt de app per werkelijke duik een registratierecord vast volgens de Open Standaard Operationele Duikregistratie (OSOD) v0.1. Elke duik krijgt bij het boven komen een blijvend record-ID. Via `Export OSOD` in het registratiescherm exporteer je die records als JSON (één record of een bundel per dag); `Import OSOD` leest OSOD-records binnen de scope van een ander systeem in. Een ingebouwde doelvalidator toetst elk record vóór export aan de schemavereisten en invarianten van de standaard, waaronder de niet-leeg-eisen voor veiligheidsregio, locatie en persoonsnamen, en de zelftestcategorie `osod` draait de elf publieke basistoetsen van de standaard bij elke start mee in de boot-gate. Records met conformiteitsclaim R dragen een sha256-rekenbronfingerprint mee; bron-id en fingerprint zijn zichtbaar in het verificatiescherm. Zie `docs/OSOD.md`; de standaard wordt als eigen OSOD-repository gepubliceerd en die publicatie is aangekondigd.
+
 ## Controleren voor een wijziging
 
 Voor ontwikkelwerk kun je lokaal dezelfde basiscontroles draaien als in CI:
@@ -77,7 +85,7 @@ sha256sum -c CHECKSUMS.sha256
 
 ## Meedenken of iets melden
 
-Gebruik `https://github.com/streuper/duikmonitor/issues/new/choose` voor reproduceerbare fouten of concrete verbeteringen. Zet geen echte namen, telefoonnummers, e-mailadressen, locaties of operationele persoonsgegevens in issues, voorbeelden of testdata. Zie `CONTRIBUTING.md` en `SECURITY.md`.
+Gebruik `https://github.com/OSOD-NL/duikmonitor/issues/new/choose` voor reproduceerbare fouten of concrete verbeteringen. Zet geen echte namen, telefoonnummers, e-mailadressen, locaties of operationele persoonsgegevens in issues, voorbeelden of testdata. Zie `CONTRIBUTING.md` en `SECURITY.md`.
 
 ## Bestanden
 
@@ -86,6 +94,7 @@ Gebruik `https://github.com/streuper/duikmonitor/issues/new/choose` voor reprodu
 | `index.html` | De volledige applicatie. |
 | `VERHAAL.md` | Het waarom, en wat de app wel en niet doet. |
 | `CHANGELOG.md` | Noemenswaardige wijzigingen per release. |
+| `RELEASE_NOTES_v1.3.0.md` | Release-notitie voor v1.3.0. |
 | `RELEASE_NOTES_v1.1.0.md` | Release-notitie voor v1.1.0. |
 | `RELEASE_NOTES_v1.0.0.md` | Release-notitie voor v1.0.0, de eerste publieke release. |
 | `CHECKSUMS.sha256` | Controlegetal van `index.html` voor deze release. |
@@ -97,6 +106,7 @@ Gebruik `https://github.com/streuper/duikmonitor/issues/new/choose` voor reprodu
 | `docs/PUBLICATIE.md` | Publieke site, GitHub-route en hostingheaders. |
 | `docs/ARCHITECTUUR.md` | Technische overdracht en safety-kritieke delen. |
 | `docs/VALIDATIE_TABELLEN.md` | Broncontrole en bewaking van de rekenmotor. |
+| `docs/OSOD.md` | OSOD v0.1-conformiteit: recordlaag, codes, export/import en toetsen. |
 | `.github/` | Issue-formulieren, PR-template en automatische checks. |
 | `_headers` | Optionele hostingheaders voor platformen die dit bestand ondersteunen. |
 | `LICENSE` | Licentievoorwaarden. |

@@ -4,8 +4,8 @@ contact_links:
     url: https://duikmonitor.app/
     about: Open de publieke Duikmonitor.
   - name: Broncode bekijken
-    url: https://github.com/streuper/duikmonitor
+    url: https://github.com/OSOD-NL/duikmonitor
     about: Bekijk broncode, documentatie en changelog.
   - name: Beveiligingsprobleem melden
-    url: https://github.com/streuper/duikmonitor/security
+    url: https://github.com/OSOD-NL/duikmonitor/security
     about: Meld beveiligingsproblemen niet openbaar in Issues.

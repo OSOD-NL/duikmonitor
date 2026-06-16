@@ -8,10 +8,10 @@ De app staat bewust in één bestand: `index.html`. Er is geen build-stap, geen 
 
 Belangrijke documentatie:
 
-- `README.md` — doel, gebruik, privacy en basiscontrole.
-- `SECURITY.md` — gegevensgarantie en bewuste niet-doen-lijst.
-- `docs/WERKWIJZE.md` — veilige wijzigingsroute via branch, PR, checks en review.
-- `docs/VALIDATIE_TABELLEN.md` — cel-voor-cel validatie, bevroren `DCIEM`-bron en waakhond-zelftest.
+- `README.md` - doel, gebruik, privacy en basiscontrole.
+- `SECURITY.md` - gegevensgarantie en bewuste niet-doen-lijst.
+- `docs/WERKWIJZE.md` - veilige wijzigingsroute via branch, PR, checks en review.
+- `docs/VALIDATIE_TABELLEN.md` - cel-voor-cel validatie, bevroren `DCIEM`-bron en waakhond-zelftest.
 
 ## 2. State-model
 
@@ -19,11 +19,11 @@ Alle gebruikersdata zit in één `state`-object en wordt lokaal opgeslagen in `l
 
 Hoofddelen:
 
-- `state.project` — datum, locatie, ploeg-/projectgegevens en instellingen voor de dag.
-- `state.divers` — vaste D1 t/m D12-slots, actief/inactief-vlag, aanduiding, standaard-MDD en materiaalvelden.
-- `state.planning` — vooraf ingevoerde/geplande duiken.
-- `state.live` — live dagregistratie, luchtmetingen, fasen en opkomst-/bovenwatermomenten.
-- `state.settings` — UI- en controle-instellingen, waaronder luchtcheckgeluid.
+- `state.project` - datum, locatie, ploeg-/projectgegevens en instellingen voor de dag.
+- `state.divers` - vaste D1 t/m D12-slots, actief/inactief-vlag, aanduiding, standaard-MDD en materiaalvelden.
+- `state.planning` - vooraf ingevoerde/geplande duiken.
+- `state.live` - live dagregistratie, luchtmetingen, fasen en opkomst-/bovenwatermomenten.
+- `state.settings` - UI- en controle-instellingen, waaronder luchtcheckgeluid.
 
 Migratie en normalisatie gebeuren in `load()`, `migrateDiveRows()`, `ensureProjectMeta()`, `ensureDivers()`, `ensureAirFields()` en verwante helperfuncties.
 
@@ -76,10 +76,10 @@ Compatibiliteitsreparatie voor oude live-records zonder timestamp. Sinds de time
 
 De hardgecodeerde tabeldata staan bovenin het script:
 
-- `airTable` — Airtabel 1 voor 6/9/12/15 m.
-- `table4aCols` en `table4a` — HF op basis van HG en OI.
-- `table4b` — herhalings-NDL voor 9/12/15 m.
-- `shallowRules` — 6/9/12-meterregel-totaallimieten.
+- `airTable` - Airtabel 1 voor 6/9/12/15 m.
+- `table4aCols` en `table4a` - HF op basis van HG en OI.
+- `table4b` - herhalings-NDL voor 9/12/15 m.
+- `shallowRules` - 6/9/12-meterregel-totaallimieten.
 
 Daarboven staat een diep bevroren bron `DCIEM` (`deepFreeze`): de single
 source of truth met dezelfde tabellen plus de meterregels, cel voor cel uit
@@ -176,8 +176,13 @@ Belangrijke functies en aandachtspunten:
   einddruk, dan toont de kaart een waarschuwingsstatus met een apart invoerveld.
   De duiktijd blijft zuiver; de einddruk is een aparte zichtbare taak
   (`latestDiveAwaitingEndBar`).
-- **MDD begrensd tot 15 m** op alle invoerplekken, plus een vergrendelde
-  "Diepte voor allen"-knop in Instellingen.
+- **Plangrens 15 m, feit blijft feit**: plannings- en standaardwaardevelden
+  (waaronder de vergrendelde "Diepte voor allen"-knop in Instellingen) houden
+  een grens op 15 m. Een werkelijk geregistreerde diepte boven 15 m blijft
+  daarentegen als feit bewaard in invoer, opslag, herladen, import en export
+  (`cleanActualMddValue`, `cleanActualAirDepthValue`); de invoer waarschuwt en
+  de berekening blokkeert buiten de envelop met `RED` en
+  `OUTSIDE_DEPTH_ENVELOPE`.
 - **Notities**: per duiker via een pen-icoon (`state.divers[].note`) en een
   dagnotitie (`state.project.dayNote`); beide lopen mee in print en export.
 - **Seinhouder (SH)** per duiker (`state.divers[].sh`), zichtbaar in de duiklog;
@@ -194,3 +199,7 @@ Belangrijke functies en aandachtspunten:
   en 5 vanaf 9 m, lengte tot de laatste werkelijk gelogde meting; geen metingen
   geeft geen kolommen.
 - **Drie oefencodes per dagdeel** (`state.project.dayparts[n].codes`).
+
+## 10. OSOD-laag
+
+Sinds v1.2.0 bevat de app een beschrijvende laag voor de Open Standaard Operationele Duikregistratie (OSOD) v0.1. Kern: `osodRecordFromEvent` bouwt per duik-event een OSOD-record op uit het bestaande interne model en de rekeneenheid; `osodCalculationFromUnit` vertaalt ernstniveau en codes van de motor naar het `calculation`-blok (status, resultValid, blockingReasons) en draagt sinds v1.3.0 in `engine.tableFingerprintSha256` de sha256 over de canonieke, sleutel-gesorteerde JSON-weergave van de diep bevroren DCIEM-bron (`osodTableFingerprintSha256`, zichtbaar in het verificatiescherm); `osodValidateRecord` is de ingebouwde doelvalidator, inclusief de niet-leeg-eisen van het schema; `exportOsodJson` en `importOsodRecords` verzorgen de uitwisseling, waarbij de import sinds v1.3.0 een harde scope-beperking hanteert: kandidaat-records worden na opname herbouwd (`osodMeaningDiff`) en buiten-scope-records worden geweigerd in plaats van herschreven. Blokkerende meldingen in `calcUnit`, `applyAscentLimits`, `applyMeterRulePeriodTotals` en `applyOperationalStatus` dragen daarvoor een machineleesbare code via de uitgebreide `addMsg(obj, sev, msg, code)`; codes worden alleen vastgelegd bij ernst 2. De HG-aanpassing bij herhalingsduiken staat in de zuivere helper `osodAdjustHG` en wordt door `calcUnit` aangeroepen; het gedrag is identiek aan de eerdere inline-variant. De laag berekent zelf niets en wijzigt geen tabel- of regelwaarden; zij leest de uitkomsten van de bestaande motor. Zie `docs/OSOD.md` voor de mapping en beperkingen.

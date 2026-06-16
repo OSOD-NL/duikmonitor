@@ -5,12 +5,20 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   controleren:
     runs-on: ubuntu-latest
     steps:
       - name: Code ophalen
         uses: actions/checkout@v4
+
+      - name: Node klaarzetten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Geheimen scannen (gitleaks)
         shell: bash

@@ -4,11 +4,11 @@ Iedereen mag meedenken. Houd meldingen klein, concreet en controleerbaar.
 
 ## Idee of verbetering
 
-Open een Issue met het sjabloon "Idee of verbetering" via `https://github.com/streuper/duikmonitor/issues/new/choose`. Beschrijf wat je voorstelt, waarom het helpt en in welke situatie het gebruikt wordt.
+Open een Issue met het sjabloon "Idee of verbetering" via `https://github.com/OSOD-NL/duikmonitor/issues/new/choose`. Beschrijf wat je voorstelt, waarom het helpt en in welke situatie het gebruikt wordt.
 
 ## Fout melden
 
-Open een Issue met het sjabloon "Probleem melden" via `https://github.com/streuper/duikmonitor/issues/new/choose`. Beschrijf wat er gebeurde, wat je verwachtte en op welk apparaat en in welke browser je werkte.
+Open een Issue met het sjabloon "Probleem melden" via `https://github.com/OSOD-NL/duikmonitor/issues/new/choose`. Beschrijf wat er gebeurde, wat je verwachtte en op welk apparaat en in welke browser je werkte.
 
 ## Geen persoonsgegevens
 

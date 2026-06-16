@@ -2,6 +2,72 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.3.0] - 2026-06-16
+
+OSOD-herstel: feitbehoud van de werkelijke diepte, een doelvalidator die het schema volledig volgt, een import met harde scope-beperking en een sha256-rekenbronfingerprint in elk rekenend record.
+
+### Toegevoegd
+
+- Sha256-rekenbronfingerprint in `calculation.engine.tableFingerprintSha256` van elk record met claim R: de sha256 over de canonieke (deterministisch sleutel-gesorteerde, UTF-8) JSON-weergave van de diep bevroren DCIEM-rekenbron. Bron-id en fingerprint zijn zichtbaar in het verificatiescherm; de interne fnv1a32-bronbewaking blijft daarnaast bestaan en is niet vervangen.
+- Conformiteitsverklaring in `docs/OSOD.md` met applicatieversie, OSOD-versie, schema, niveaus, toetsdatum, rekenbronfingerprint en afwijkingen, plus de expliciete claimformule en importafbakening in `README.md` en `docs/OSOD.md`.
+- Zelftests voor de niet-leeg-eisen per veldsoort, de sha256-vectoren en fingerprintstabiliteit, de volledige diepte-als-feit-keten rond 16,4 m (invoer, opslag, herladen, state-import, OSOD-export en OSOD-import), de importweigeringen en de oefencodelengte.
+
+### Gewijzigd
+
+- Werkelijke diepte boven 15 m blijft overal een feit: invoer, opslag, herladen, JSON-import en OSOD-export bewaren de waarde en maken haar niet leeg en zetten haar niet terug naar 15 m. De invoer waarschuwt; de DCIEM-berekening blokkeert buiten de envelop met `RED` en `OUTSIDE_DEPTH_ENVELOPE`, `tabelDiepteM` wordt `null` en er wordt geen geldige rekenuitkomst gepresenteerd (geïntegreerd gedrag van basistoets R-BASIS-004). Plan- en standaardwaardevelden houden hun grens op 15 m; die plangrens overschrijft nooit een geregistreerd feit. De zelftests die het oude leegmaken en afvlakken borgden zijn omgezet naar borging van het feitbehoud.
+- Doelvalidator volgt het schema nu ook op de niet-leeg-eisen: `context.veiligheidsregio`, `context.locatie.omschrijving` en `displayName` van elke persoonsreferentie (duikploegleider, elke duiker en, indien aanwezig, duikmedisch begeleider) moeten gevuld zijn; `roles.duikers` vereist minstens één duiker en de fingerprintvorm wordt gecontroleerd. De export blokkeert op deze punten met een duidelijke melding.
+- Import OSOD hanteert een harde scope-beperking: alleen afgeronde ademluchtrecords die de registratielaag volledig en betekenisbehoudend kan dragen worden opgenomen; elk kandidaat-record wordt na opname herbouwd en moet betekenisgelijk zijn aan het importrecord. Records buiten scope worden geweigerd met een duidelijke melding, in plaats van herschreven: geen ander ademgas naar ademlucht, geen ophoging van een S-claim, geen stil vervangen van context, rollen, diepte of calculation-blok, geen behoud van recordId bij inhoudelijke herschrijving. Alleen de conservatieve richting is toegestaan: een geïmporteerd `GREEN` kan door extra eigen niet-blokkerende controles `AMBER` worden bij gelijke `resultValid`, lege `blockingReasons` en gelijke rekenuitkomsten.
+- Oefencodeveld verruimd zodat officiële codes volgens BRW-BWD.NN en BRW-DPL.NN (10 tekens) niet worden afgekapt.
+- Typografische lange strepen in app- en documentatieteksten vervangen door gewone koppeltekens, conform het publicatiebesluit over leesbare en gereedschapsneutrale tekst.
+- Verwijzingen naar de OSOD-repository vervangen door een aankondigingsformulering totdat die publicatie heeft plaatsgevonden.
+- `docs/OSOD.md` gecorrigeerd waar het document het schema en het dieptegedrag onjuist beschreef (het schema staat geen lege strings toe op de drie genoemde plekken; een diepte boven 15 m is registreerbaar en geeft `RED` met `OUTSIDE_DEPTH_ENVELOPE`, niet `BLOCKED` met `INVALID_INPUT`).
+- Bronconflictformulering rond Tabel 4a (HG B, OI 2:00-2:59) neutraal gemaakt: de eerdere kwalificatie van de WOD-cel als vermoedelijke fout en de aanbeveling tot correctie door de bronhouder vervallen; de WOD-waarde 1,1 wordt neutraal als gedocumenteerd bronconflict beschreven, in lijn met de OSOD-bronpositie. De app blijft 1,2 hanteren; rekenuitkomsten ongewijzigd.
+- Resterende en-streepjes en het minteken in app- en documentatieteksten vervangen door gewone koppeltekens, in aanvulling op de eerdere em-streepjes-opruiming, conform het publicatiebesluit over leesbare en gereedschapsneutrale tekst.
+- Duiksysteemwaarden in lijn gebracht met besluit B-0018: de losse waarde `OLV` vervalt als duiksysteemwaarde (toegestaan: `SCUBA`, `SCUBA_OLV`, `SSE`, `anders`, `onbekend`); een bestaande of geimporteerde kale `OLV` wordt betekenisbehoudend genormaliseerd naar `SCUBA_OLV`. Rekenuitkomsten en tabelwaarden ongewijzigd.
+
+### Niet gewijzigd
+
+- DCIEM-tabelwaarden, meterregels, daglimieten, opstijgingsregels en de rekenuitkomsten binnen de envelop zijn inhoudelijk niet gewijzigd; de wijzigingen betreffen feitbehoud, validatie, import, fingerprint en documentatie.
+
+## [1.2.1] - 2026-06-11
+
+Borging aangescherpt: rekeninvarianten en CI-hardening. Geen functionele wijziging.
+
+### Toegevoegd
+
+- Zelftestcategorie `invariant` (boot-gate-kritiek): zeven eigenschapstests die structurele eigenschappen van tabellen en motor bewaken: HG niet-dalend in DT zonder gaten in Airtabel 1; HF niet-stijgend in OI, binnen 1,0 tot 2,0, lege cellen alleen vooraan in tabel 4a; herhalings-NDL niet-stijgend in HF in tabel 4b; EDT nooit kleiner dan DT; monotone blokkering bij tabelgrens en meterregel; determinisme van de rekenmotor; en de eigenschappen van de HG-aanpassing over alle lettercombinaties. Totaal 333 zelftests.
+
+### Gewijzigd
+
+- CI-workflow draait met minimale tokenrechten (`permissions: contents: read`).
+- CI gebruikt een vastgezette Node-versie (22), zodat de controleomgeving lokaal en op GitHub voorspelbaar gelijk is.
+
+### Niet gewijzigd
+
+- Tabellen, regels, rekenuitkomsten, opslag, export en CSP zijn niet aangeraakt.
+
+## [1.2.0] - 2026-06-11
+
+OSOD v0.1-conformiteit: de registratie spreekt nu de open standaard.
+
+### Toegevoegd
+
+- OSOD-recordlaag (conformiteitsclaims S en R): elke werkelijke duik krijgt bij het boven komen een blijvend record-ID en is op elk moment als OSOD-record op te bouwen.
+- Machineleesbare rekenuitkomsten: blokkerende meldingen dragen nu een code (onder meer `OUTSIDE_DEPTH_ENVELOPE`, `BOTTOM_TIME_EXCEEDS_TABLE`, `BOTTOM_TIME_EXCEEDS_METER_RULE`, `EMPTY_TABLE_CELL`, `INVALID_INPUT`) en worden vertaald naar een `calculation`-blok met `status`, `resultValid` en `blockingReasons`.
+- Knoppen `Export OSOD` en `Import OSOD` in Beheer en export: JSON-uitwisseling (één record of een bundel per dag), met een ingebouwde doelvalidator die elk record vóór export toetst, en import van geldige records uit andere systemen.
+- Projectvelden Veiligheidsregio, Activiteittype en Duiksysteem voor de OSOD-context.
+- Zelftestcategorie `osod` (boot-gate-kritiek): de elf publieke basistoetsen R-BASIS-001 t/m R-BASIS-011 van de standaard, plus validator- en rondtriptests; totaal 326 zelftests.
+- Nieuw document `docs/OSOD.md` met de conformiteitsverklaring, veldmapping, codecatalogus en beperkingen.
+
+### Gewijzigd
+
+- HG-aanpassing bij herhalingsduiken verplaatst naar een zuivere helper (`osodAdjustHG`); rekengedrag ongewijzigd en afgedekt door bestaande en nieuwe zelftests.
+- Repositoryverwijzingen bijgewerkt naar `github.com/OSOD-NL/duikmonitor`.
+
+### Niet gewijzigd
+
+- DCIEM-tabelwaarden, meterregels, daglimieten, opstijgingsregels en alle rekenuitkomsten zijn inhoudelijk niet gewijzigd; de OSOD-laag beschrijft bestaande uitkomsten en voegt geen nieuwe rekenpaden toe.
+
 ## [1.1.0] - 2026-06-07
 
 Release-afronding van de registratie- en instellingenwijziging.

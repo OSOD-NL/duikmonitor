@@ -35,12 +35,12 @@ De code laat de lege broncellen (`B,E,I` bij 9 m; `C,E,F,I` bij 12 m) bewust weg
 
 ## 2. Tabel 4a (logboek p. 29)
 
-Alle 15 rijen (A t/m O) en 11 OI-kolommen (0:15–0:29 t/m 15:00–18:00) cel voor cel gecontroleerd tegen `table4a` en `table4aCols`. Inclusief de lege cellen linksonder in de tabel.
+Alle 15 rijen (A t/m O) en 11 OI-kolommen (0:15-0:29 t/m 15:00-18:00) cel voor cel gecontroleerd tegen `table4a` en `table4aCols`. Inclusief de lege cellen linksonder in de tabel.
 
 Aandachtspunten die expliciet zijn nagekeken:
-- HG B / OI 2:00–2:59 = 1,2 in de bron. Komt overeen met de code en met de bestaande zelftest.
-- HG G / OI 15:00–18:00 = 1,0 in de bron. Komt overeen met de code.
-- De lege cellen per rij (G mist kolom 1; H/I missen kolommen 1–2; J/K missen kolommen 1–3; L mist 1–4; M/N/O missen 1–5) komen overeen met de `null`-posities in de code.
+- HG B / OI 2:00-2:59 = 1,2 in de bron. Komt overeen met de code en met de bestaande zelftest.
+- HG G / OI 15:00-18:00 = 1,0 in de bron. Komt overeen met de code.
+- De lege cellen per rij (G mist kolom 1; H/I missen kolommen 1-2; J/K missen kolommen 1-3; L mist 1-4; M/N/O missen 1-5) komen overeen met de `null`-posities in de code.
 
 Resultaat: 165 cellen gecontroleerd, geen afwijking.
 
@@ -212,8 +212,7 @@ op het getal overeen met `table4b` in de app en met de IWOD-bron:
 | 15 m | 60 55 50 45 41 38 36 34 32 31 |
 
 Hiermee zijn er twee onafhankelijke bronnen die dezelfde herhalings-nultijden
-opleveren: de Nederlandse IWOD 002 (2019) en het DCIEM-origineel (1992). Dat sluit
-een overschrijffout in de IWOD-afgeleide uit voor dit tabeldeel.
+opleveren: de Nederlandse IWOD 002 (2019) en het DCIEM-origineel (1992). Dat bevestigt de IWOD-afgeleide voor dit tabeldeel.
 
 Beperking: de herhalingsfactoren (Tabel 4A) in het origineel staan met
 grijs-gearceerde cellen die bij automatische tekstextractie onbetrouwbaar
@@ -289,25 +288,21 @@ aantallen opstijgingen per periode/dag. Die aantallen (6/4 per 4 uur, 12/8 per d
 voor 6/9 m) komen uit het onderliggende DMC-advies van 10 december 2013 (zie 3b).
 De app vult dit gat dus met de juiste primaire bron en verzint de aantallen niet.
 
-**2. Eén afwijkende cel in Tabel 4a.** In de WOD-versie van Tabel 4a staat voor
+**2. Bronconflict op één cel in Tabel 4a.** In de WOD-versie van Tabel 4a staat voor
 herhalingsgroep **B** bij oppervlakte-interval **2:00-2:59** een HF van **1,1**.
-De app houdt daar **1,2** aan. De app is hier naar alle waarschijnlijkheid correct
-en de WOD-cel bevat vermoedelijk een overschrijffout, om drie redenen:
+De app houdt daar **1,2** aan, de waarde van de primaire DCIEM/IWOD-bron. Dit is
+een gedocumenteerd bronconflict, onderbouwd door drie waarnemingen:
 
 - Drie onafhankelijke bronnen geven 1,2: de IWOD 002 (2019), het DCIEM-origineel
-  (1992) en de cel-voor-cel controle hierboven. Alleen de
-  WOD 2024 wijkt op deze ene cel af.
+  (1992) en de cel-voor-cel controle hierboven. De WOD 2024 geeft op deze ene cel 1,1.
 - Het tabelpatroon ondersteunt 1,2: in de kolom 2:00-2:59 loopt de reeks per groep
   monotoon op (A 1,1 / B 1,2 / C 1,2 / D 1,3). Een waarde 1,1 voor B zou die reeks
-  onlogisch onderbreken.
-- De WOD verwijst zelf naar de DCIEM-tabellen als bron; een bewuste afwijking van
-  één enkele cel zonder vermelding ligt niet voor de hand.
+  onderbreken.
+- De WOD verwijst zelf naar de DCIEM-tabellen als bron.
 
-Conclusie: de app volgt de primaire DCIEM/IWOD-waarde (1,2) en neemt de
-vermoedelijke overschrijffout in de WOD niet over. Dit illustreert de waarde van
-toetsen tegen meerdere bronnen in plaats van één afgeleid document. Het verdient
-aanbeveling deze cel bij een volgende WOD-herziening door de bronhouder te laten
-corrigeren.
+Conclusie: de app volgt de primaire DCIEM/IWOD-waarde (1,2); de WOD-waarde 1,1 wordt
+neutraal als gedocumenteerd bronconflict vastgelegd. Dit illustreert de waarde van
+toetsen tegen meerdere bronnen in plaats van één afgeleid document.
 
 ## 4. Verhouding tot de boot-gate en het controlegetal
 

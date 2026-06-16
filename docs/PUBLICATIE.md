@@ -12,8 +12,8 @@ De app blijft local-first: ingevulde duikgegevens, berekeningen en exports worde
 
 ## GitHub-route
 
-- Broncode en documentatie: `https://github.com/streuper/duikmonitor`
-- Fouten en verbeterideeën: `https://github.com/streuper/duikmonitor/issues/new/choose`
+- Broncode en documentatie: `https://github.com/OSOD-NL/duikmonitor`
+- Fouten en verbeterideeën: `https://github.com/OSOD-NL/duikmonitor/issues/new/choose`
 - Beveiligingsproblemen: gebruik de security-route van de repository; meld dit niet openbaar in Issues.
 
 Zet geen echte namen, telefoonnummers, e-mailadressen, locaties of operationele persoonsgegevens in Issues, voorbeelden, exports of testdata. Gebruik neutrale voorbeelden zoals `Duiker 1`.
