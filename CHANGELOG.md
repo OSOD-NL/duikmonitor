@@ -2,6 +2,19 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.4.0] - 2026-06-17
+
+Domeincorrectie naar het live domein duikmonitor.nl, een knop op de Instellingen-pagina naar de installatiepagina en een opgeschoonde installatiepagina onder /webclip/.
+
+### Toegevoegd
+
+- Knop "Op je beginscherm zetten" op de Instellingen-pagina die naar de installatiepagina /webclip/ verwijst, zodat de gebruiker leest hoe hij Duikmonitor als pictogram op iPhone of iPad zet.
+
+### Gewijzigd
+
+- Publiek domein gecorrigeerd naar duikmonitor.nl op alle plekken in de app, de documentatie en de issue-sjabloonconfiguratie; het eerdere, onjuiste domein is overal vervangen. De bijbehorende zelftestwaarden voor de publieke website-url en het instellingenlabel schuiven mee.
+- Installatiepagina /webclip/index.html vervangen door een opgeschoonde pagina met de Safari-route voorop en het configuratieprofiel als fallback.
+
 ## [1.3.0] - 2026-06-16
 
 OSOD-herstel: feitbehoud van de werkelijke diepte, een doelvalidator die het schema volledig volgt, een import met harde scope-beperking en een sha256-rekenbronfingerprint in elk rekenend record.

@@ -2,7 +2,7 @@
 
 Gebruik de volgende route:
 
-- App openen: `https://duikmonitor.app/`
+- App openen: `https://duikmonitor.nl/`
 - Broncode en documentatie: `https://github.com/OSOD-NL/duikmonitor`
 
 - Reproduceerbare fout: open een Issue met het formulier "Probleem melden" via `https://github.com/OSOD-NL/duikmonitor/issues/new/choose`.

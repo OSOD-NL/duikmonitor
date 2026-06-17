@@ -5,7 +5,7 @@
 De publieke ingang is:
 
 ```text
-https://duikmonitor.app/
+https://duikmonitor.nl/
 ```
 
 De app blijft local-first: ingevulde duikgegevens, berekeningen en exports worden niet door de app naar GitHub, de beheerder of een eigen server verzonden. Bij het openen van een publieke website kan de hostinglaag wel normale technische requestgegevens verwerken om de appbestanden te leveren.

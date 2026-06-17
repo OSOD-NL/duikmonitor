@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Duikmonitor openen
-    url: https://duikmonitor.app/
+    url: https://duikmonitor.nl/
     about: Open de publieke Duikmonitor.
   - name: Broncode bekijken
     url: https://github.com/OSOD-NL/duikmonitor

@@ -9,7 +9,7 @@ Een eenvoudige, **offline-first** webapplicatie om duiken te plannen, live te mo
 - Er zijn geen accounts, trackers, analytics, externe opslag of synchronisatie.
 - De app gebruikt een strenge Content Security Policy: `connect-src 'none'`, `form-action 'none'` en `object-src 'none'`.
 - Exporteren of printen is altijd een lokale actie naar je eigen apparaat.
-- Als je de app via `duikmonitor.app` of als lokaal bestand opent, worden alleen de appbestanden geladen. Ingevulde duikgegevens en berekeningen worden niet door de app naar GitHub, de beheerder of een eigen server verzonden. Een publieke website kan wel normale technische requestgegevens verwerken om de pagina te leveren; dat staat los van de lokale appdata.
+- Als je de app via `duikmonitor.nl` of als lokaal bestand opent, worden alleen de appbestanden geladen. Ingevulde duikgegevens en berekeningen worden niet door de app naar GitHub, de beheerder of een eigen server verzonden. Een publieke website kan wel normale technische requestgegevens verwerken om de pagina te leveren; dat staat los van de lokale appdata.
 
 ## Status
 
@@ -36,7 +36,7 @@ Deze grenzen beperken complexiteit en beschermen de privacy-architectuur.
 
 ## Gebruiken
 
-Open de publieke app via `https://duikmonitor.app/` of open `index.html` lokaal in een browser. Er is geen installatie, server of build-stap nodig voor lokaal gebruik.
+Open de publieke app via `https://duikmonitor.nl/` of open `index.html` lokaal in een browser. Er is geen installatie, server of build-stap nodig voor lokaal gebruik.
 
 ## Wat de app doet
 
