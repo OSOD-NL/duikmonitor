@@ -93,10 +93,7 @@ Gebruik `https://github.com/OSOD-NL/duikmonitor/issues/new/choose` voor reproduc
 |---|---|
 | `index.html` | De volledige applicatie. |
 | `VERHAAL.md` | Het waarom, en wat de app wel en niet doet. |
-| `CHANGELOG.md` | Noemenswaardige wijzigingen per release. |
-| `RELEASE_NOTES_v1.3.0.md` | Release-notitie voor v1.3.0. |
-| `RELEASE_NOTES_v1.1.0.md` | Release-notitie voor v1.1.0. |
-| `RELEASE_NOTES_v1.0.0.md` | Release-notitie voor v1.0.0, de eerste publieke release. |
+| `CHANGELOG.md` | Noemenswaardige wijzigingen per release. Release-documentatie loopt via dit bestand en de GitHub-release. |
 | `CHECKSUMS.sha256` | Controlegetal van `index.html` voor deze release. |
 | `SECURITY.md` | Privacy, gegevensverwerking en beveiligingsmelding. |
 | `CONTRIBUTING.md` | Hoe je een melding of wijziging netjes aanlevert. |
