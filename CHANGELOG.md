@@ -2,6 +2,23 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.5.0] - 2026-06-18
+
+Officieel Duikmonitor-app-icoon (variant B helder) op het beginscherm en in de browser, en de knop naar de installatiepagina geeft voortaan de actieve schermstand mee.
+
+### Toegevoegd
+
+- Officiele app-iconen in de hoofdmap: favicon (SVG met PNG- en ICO-terugval in 16, 32, 192 en 512), maskable icoon van 512, apple-touch-iconen (algemeen, 120, 152, 167) en een webmanifest. Het iOS-beginscherm en de browser tonen nu het Duikmonitor-icoon in plaats van de terugval-letter D.
+- Icoon-, manifest- en titelregels in de head van de app, met behoud van het bestaande dag- en nacht-themasysteem en de dynamische themakleur.
+
+### Gewijzigd
+
+- De knop "Op je beginscherm zetten" op de Instellingen-pagina geeft de opgeloste schermstand mee aan de installatiepagina (/webclip/?theme=day of /webclip/?theme=night), ook wanneer de voorkeur op automatisch staat. Knoptekst en stijl blijven gelijk.
+
+### Niet gewijzigd
+
+- Rekenkern, tabellen, daglimieten, opstijgingsregels, blokkeerlogica, statussemantiek, schema en toetsvectoren zijn niet aangeraakt. De installatiepagina en het configuratieprofiel onder /webclip/ blijven in deze versie ongewijzigd.
+
 ## [1.4.0] - 2026-06-17
 
 Domeincorrectie naar het live domein duikmonitor.nl, een knop op de Instellingen-pagina naar de installatiepagina en een opgeschoonde installatiepagina onder /webclip/.
