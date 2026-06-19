@@ -2,6 +2,27 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.6.0] - 2026-06-19
+
+Installatiestrook in de app toegevoegd; de losse webclip-pagina is vervallen.
+
+### Toegevoegd
+
+- Installatiestrook boven in de app: een opvallende strook met een vaste petrol/oranje weergave (gelijk in dag- en nachtmodus) die uitnodigt om Duikmonitor op het beginscherm te zetten. De strook staat standaard ingeklapt en klapt open met twee routes: iPhone en iPad (via Safari, Delen, Zet op beginscherm) en Android (via het browsermenu, App installeren of Toevoegen aan startscherm).
+- Standalone-detectie die de installatiestrook verbergt zodra de app al als webapp op het beginscherm draait, zodat vaste gebruikers hun schermruimte houden. Puur cosmetisch; rekenkern, zelftests en bestaand gedrag blijven ongemoeid.
+
+### Gewijzigd
+
+- Appversielabel verhoogd naar v1.6.0; de bijbehorende zelftest-assertie controleert mee op v1.6.0. Het opstart-zelftal blijft 361/361.
+
+### Verwijderd
+
+- Het kaartje "Op je beginscherm zetten" op de Instellingen-pagina dat naar de verwijderde webclip-pagina verwees, is weggehaald. De installatiestrook neemt die functie over; er is geen verwijzing naar een webclip-pagina, configuratieprofiel of mobileconfig meer in de app.
+
+### Niet gewijzigd
+
+- Rekenkern, tabelwaarden, blokkeerlogica, statussemantiek, schema en toetsvectoren zijn niet aangeraakt. site.webmanifest, _headers en de iconen blijven ongemoeid.
+
 ## [1.5.0] - 2026-06-18
 
 Officieel Duikmonitor-app-icoon (variant B helder) op het beginscherm en in de browser, en de knop naar de installatiepagina geeft voortaan de actieve schermstand mee.
