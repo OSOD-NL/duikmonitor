@@ -1,12 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B82F6"/><stop offset="1" stop-color="#0C2A6B"/></linearGradient>
-    <clipPath id="r"><rect x="0" y="0" width="1024" height="1024" rx="230" ry="230"/></clipPath>
-  </defs>
-  <g clip-path="url(#r)">
-    <rect width="1024" height="1024" fill="url(#bg)"/>
-    <circle cx="512" cy="512" r="300" fill="#67E8F9" opacity="0.30"/>
-    <circle cx="512" cy="512" r="200" fill="#A5F3FC" opacity="0.55"/>
-    <circle cx="512" cy="512" r="140" fill="#FFFFFF"/>
-  </g>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B5566"/><stop offset="1" stop-color="#0A2129"/></linearGradient></defs>
+  <rect width="1024" height="1024" fill="url(#g)"/>
+  <g transform="translate(146.6 236.5) scale(2.9)" fill="#FFFFFF"><rect x="0" y="73" width="22" height="44" rx="11"/>
+<rect x="230" y="73" width="22" height="44" rx="11"/>
+<path fill-rule="evenodd" d="M 58 14 H 194 Q 240 14 240 60 V 130 Q 240 176 194 176 H 58 Q 12 176 12 130 V 60 Q 12 14 58 14 Z M 66 42 H 186 Q 212 42 212 68 V 122 Q 212 148 186 148 H 152 C 148 130 143 119 126 119 C 109 119 104 130 100 148 H 66 Q 40 148 40 122 V 68 Q 40 42 66 42 Z"/><circle cx="182" cy="70" r="13" fill="#E4572E"/></g>
 </svg>
