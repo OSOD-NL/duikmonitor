@@ -3,29 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#10151a">
-  <meta name="color-scheme" content="dark">
-  <meta name="description" content="Zet Duikmonitor via Safari op je beginscherm als webapp. Geen profiel nodig.">
+  <meta name="theme-color" content="#FFFFFF">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Zet Duikmonitor op je beginscherm als webapp. Werkt op iPhone, iPad en Android. Geen profiel nodig.">
   <title>Duikmonitor installeren</title>
 
   <style>
     :root{
-      --bg:#0b0f14;
-      --bg-soft:#111820;
+      --bg:#ffffff;
+      --bg-soft:#f4f6f8;
       --card:#ffffff;
       --card-2:#f6f8fa;
       --ink:#10151a;
-      --text:#eaf0f6;
-      --text-soft:#aeb8c4;
-      --muted:#687482;
-      --line:rgba(255,255,255,.13);
-      --line-dark:#e8edf2;
-      --accent:#ff5638;
-      --accent-2:#ff876d;
-      --accent-soft:rgba(255,86,56,.14);
-      --green:#64d68a;
-      --yellow:#ffd166;
-      --shadow:0 28px 90px rgba(0,0,0,.42);
+      --text:#1c2530;
+      --text-soft:#566273;
+      --muted:#6b7686;
+      --line:rgba(16,21,26,.12);
+      --line-dark:#e2e7ec;
+      --accent:#d8442a;
+      --accent-2:#ff5638;
+      --accent-soft:rgba(216,68,42,.1);
+      --green:#1f8a4c;
+      --yellow:#b87514;
+      --shadow:0 24px 70px rgba(16,21,26,.12);
       --radius:28px;
       --radius-sm:18px;
       --max:1040px;
@@ -38,9 +38,9 @@
       min-height:100vh;
       font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
       background:
-        radial-gradient(circle at 18% 0%, rgba(255,86,56,.24), transparent 34rem),
-        radial-gradient(circle at 92% 12%, rgba(103,174,255,.16), transparent 38rem),
-        linear-gradient(180deg,#141b23 0%,#0b0f14 58%,#070a0e 100%);
+        radial-gradient(circle at 18% 0%, rgba(255,86,56,.08), transparent 34rem),
+        radial-gradient(circle at 92% 12%, rgba(103,174,255,.08), transparent 38rem),
+        linear-gradient(180deg,#ffffff 0%,#f4f6f8 58%,#eef1f4 100%);
       color:var(--text);
       -webkit-font-smoothing:antialiased;
       text-rendering:optimizeLegibility;
@@ -75,7 +75,7 @@
       gap:10px;
       min-width:0;
       text-decoration:none;
-      color:var(--text);
+      color:var(--ink);
       font-weight:720;
       letter-spacing:-.02em;
     }
@@ -86,9 +86,9 @@
       border-radius:11px;
       display:grid;
       place-items:center;
-      background:rgba(255,255,255,.08);
-      border:1px solid rgba(255,255,255,.1);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.12);
+      background:var(--accent-soft);
+      border:1px solid rgba(216,68,42,.2);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.5);
       color:var(--accent);
       flex:none;
     }
@@ -106,12 +106,12 @@
       flex:none;
       font-size:12px;
       font-weight:720;
-      color:#fff;
-      background:rgba(255,255,255,.08);
-      border:1px solid rgba(255,255,255,.11);
+      color:var(--ink);
+      background:var(--card-2);
+      border:1px solid var(--line-dark);
       border-radius:999px;
       padding:8px 11px;
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.09);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
     }
 
     .hero{
@@ -122,12 +122,10 @@
     }
 
     .panel{
-      background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.065));
-      border:1px solid rgba(255,255,255,.13);
+      background:#ffffff;
+      border:1px solid var(--line-dark);
       border-radius:var(--radius);
       box-shadow:var(--shadow);
-      backdrop-filter:blur(18px);
-      -webkit-backdrop-filter:blur(18px);
       overflow:hidden;
     }
 
@@ -145,9 +143,9 @@
       align-items:center;
       gap:8px;
       width:max-content;
-      color:#fff;
-      background:rgba(255,86,56,.14);
-      border:1px solid rgba(255,86,56,.38);
+      color:var(--accent);
+      background:var(--accent-soft);
+      border:1px solid rgba(216,68,42,.3);
       border-radius:999px;
       padding:8px 12px;
       font-size:12px;
@@ -182,7 +180,7 @@
     }
 
     .lead strong{
-      color:#fff;
+      color:var(--ink);
       font-weight:760;
     }
 
@@ -222,12 +220,12 @@
     }
 
     .secondary{
-      color:#fff;
-      background:rgba(255,255,255,.08);
-      border:1px solid rgba(255,255,255,.13);
+      color:var(--ink);
+      background:var(--card-2);
+      border:1px solid var(--line-dark);
     }
 
-    .secondary:hover{background:rgba(255,255,255,.12)}
+    .secondary:hover{background:#eef1f4}
 
     .status{
       display:flex;
@@ -235,15 +233,15 @@
       gap:12px;
       padding:14px 15px;
       margin-top:26px;
-      background:rgba(255,255,255,.07);
-      border:1px solid rgba(255,255,255,.1);
+      background:var(--card-2);
+      border:1px solid var(--line-dark);
       border-radius:18px;
       color:var(--text-soft);
       font-size:14px;
       line-height:1.42;
     }
 
-    .status strong{color:#fff}
+    .status strong{color:var(--ink)}
     .status .status-icon{
       width:24px;
       height:24px;
@@ -251,8 +249,8 @@
       border-radius:50%;
       display:grid;
       place-items:center;
-      color:#10151a;
-      background:var(--yellow);
+      color:#ffffff;
+      background:var(--accent);
       margin-top:1px;
       font-weight:900;
     }
@@ -268,8 +266,8 @@
       display:inline-flex;
       align-items:center;
       gap:7px;
-      border:1px solid rgba(255,255,255,.11);
-      background:rgba(255,255,255,.06);
+      border:1px solid var(--line-dark);
+      background:var(--card-2);
       color:var(--text-soft);
       border-radius:999px;
       padding:8px 10px;
@@ -277,7 +275,7 @@
       font-weight:650;
     }
 
-    .chip svg{width:15px;height:15px;color:var(--accent-2);flex:none}
+    .chip svg{width:15px;height:15px;color:var(--accent);flex:none}
 
     .preview{
       padding:22px;
@@ -607,16 +605,16 @@
 
     .soft-card{
       border-radius:var(--radius);
-      border:1px solid rgba(255,255,255,.13);
-      background:rgba(255,255,255,.075);
-      box-shadow:0 18px 50px rgba(0,0,0,.18);
+      border:1px solid var(--line-dark);
+      background:#ffffff;
+      box-shadow:var(--shadow);
       padding:24px;
       color:var(--text);
     }
 
     .soft-card h2{
       font-size:25px;
-      color:#fff;
+      color:var(--ink);
     }
 
     .soft-card p{
@@ -638,7 +636,7 @@
       display:flex;
       gap:10px;
       align-items:flex-start;
-      color:#dce5ee;
+      color:var(--text);
       font-size:14.5px;
       line-height:1.42;
     }
@@ -649,7 +647,7 @@
       border-radius:50%;
       display:grid;
       place-items:center;
-      background:rgba(100,214,138,.15);
+      background:rgba(31,138,76,.12);
       color:var(--green);
       flex:none;
       font-weight:900;
@@ -660,8 +658,9 @@
       margin-top:22px;
       border-radius:var(--radius);
       overflow:hidden;
-      background:rgba(255,255,255,.06);
-      border:1px solid rgba(255,255,255,.12);
+      background:#ffffff;
+      border:1px solid var(--line-dark);
+      box-shadow:var(--shadow);
     }
 
     details.profile summary{
@@ -674,7 +673,7 @@
       padding:22px 24px;
       font-size:17px;
       font-weight:780;
-      color:#fff;
+      color:var(--ink);
     }
 
     details.profile summary::-webkit-details-marker{display:none}
@@ -682,8 +681,8 @@
       content:"";
       width:11px;
       height:11px;
-      border-right:2px solid rgba(255,255,255,.75);
-      border-bottom:2px solid rgba(255,255,255,.75);
+      border-right:2px solid var(--muted);
+      border-bottom:2px solid var(--muted);
       transform:rotate(45deg);
       transition:transform .18s ease;
       margin-top:-5px;
@@ -703,15 +702,15 @@
     }
 
     .profile-body .warning{
-      border:1px solid rgba(255,209,102,.35);
-      background:rgba(255,209,102,.1);
-      color:#ffe7a2;
+      border:1px solid rgba(184,117,20,.35);
+      background:rgba(184,117,20,.08);
+      color:#7a4e0d;
       border-radius:18px;
       padding:14px;
       margin:14px 0;
     }
 
-    .profile-body .warning strong{color:#fff}
+    .profile-body .warning strong{color:var(--ink)}
     .profile-body .profile-actions{
       display:flex;
       flex-wrap:wrap;
@@ -720,10 +719,10 @@
     }
 
     .small-link{
-      color:#fff;
+      color:var(--ink);
       text-decoration:none;
       font-weight:730;
-      border-bottom:1px solid rgba(255,255,255,.35);
+      border-bottom:1px solid var(--muted);
     }
 
     .footer{
@@ -737,9 +736,9 @@
     }
 
     .footer a{
-      color:#fff;
+      color:var(--ink);
       text-decoration:none;
-      border-bottom:1px solid rgba(255,255,255,.28);
+      border-bottom:1px solid var(--muted);
     }
 
     .toast{
@@ -749,10 +748,10 @@
       transform:translateX(-50%) translateY(18px);
       opacity:0;
       pointer-events:none;
-      background:#fff;
-      color:#10151a;
+      background:#10151a;
+      color:#ffffff;
       border-radius:999px;
-      box-shadow:0 18px 50px rgba(0,0,0,.38);
+      box-shadow:0 18px 50px rgba(16,21,26,.3);
       padding:12px 16px;
       font-size:14px;
       font-weight:750;
@@ -764,6 +763,24 @@
     .toast.show{
       opacity:1;
       transform:translateX(-50%) translateY(0);
+    }
+
+    .route-head{
+      padding:18px 24px 0;
+    }
+
+    .route-title{
+      margin:0;
+      font-size:18px;
+      letter-spacing:-.02em;
+      color:var(--ink);
+    }
+
+    .route-note{
+      margin:4px 0 0;
+      color:var(--text-soft);
+      font-size:14px;
+      line-height:1.5;
     }
 
     @media (max-width:880px){
@@ -838,6 +855,9 @@
       .steps{
         padding:8px 18px 18px;
       }
+      .route-head{
+        padding:14px 18px 0;
+      }
       .step{
         grid-template-columns:36px 1fr;
         padding:14px;
@@ -880,7 +900,7 @@
         </span>
         <span>Duikmonitor<small>OSOD-NL</small></span>
       </a>
-      <span class="badge">iPhone · iPad · Safari</span>
+      <span class="badge">iPhone · iPad · Android</span>
     </header>
 
     <main>
@@ -888,10 +908,9 @@
         <div class="panel hero-copy">
           <div>
             <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Aanbevolen installatie</p>
-            <h1 id="page-title">Zet Duikmonitor als app op je beginscherm.</h1>
+            <h1 id="page-title">Duikmonitor op je beginscherm zetten.</h1>
             <p class="lead">
-              Gebruik de officiële Safari-route. <strong>Geen profiel nodig</strong>, geen App Store en geen apparaatbeheer.
-              In nieuwere iOS-versies kun je bij het toevoegen kiezen voor <strong>Open als webapp</strong>.
+              Zet Duikmonitor als webapp op je beginscherm. Dat werkt op iPhone en iPad via Safari en op Android via Chrome, Edge of Samsung Internet. <strong>Geen profiel nodig</strong>, geen App Store en geen apparaatbeheer.
             </p>
 
             <div class="actions">
@@ -912,7 +931,7 @@
             <div class="status" id="device-status" role="status">
               <span class="status-icon" aria-hidden="true">i</span>
               <span id="device-status-text">
-                Open deze pagina op je iPhone of iPad in Safari en volg de stappen hieronder.
+                Open deze pagina op je telefoon of tablet en volg de stappen hieronder voor jouw toestel.
               </span>
             </div>
           </div>
@@ -928,7 +947,7 @@
             </span>
             <span class="chip">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M12 18h.01"/></svg>
-              Werkt op iPhone en iPad
+              Werkt op iPhone, iPad en Android
             </span>
           </div>
         </div>
@@ -990,8 +1009,13 @@
           <span class="section-kicker">Stappen</span>
           <h2 id="steps-title">Zo zet je Duikmonitor op je beginscherm</h2>
           <p class="section-intro">
-            iOS laat websites niet automatisch zichzelf installeren. Je doet dit bewust via Safari. Dat is juist de veilige en herkenbare manier.
+            Kies de route die bij jouw toestel past. Op iPhone en iPad gaat het via Safari, op Android via je browser. Beide routes voegen alleen een snelle toegang tot de website toe.
           </p>
+        </div>
+
+        <div class="route-head">
+          <h3 class="route-title">Op iPhone of iPad</h3>
+          <p class="route-note">Doe dit in Safari. Dat is de veilige en herkenbare manier.</p>
         </div>
 
         <ol class="steps">
@@ -1028,6 +1052,42 @@
             <div>
               <h3>Tik op “Voeg toe”</h3>
               <p>Daarna staat Duikmonitor als icoon op je beginscherm. Open hem vanaf daar voor de beste ervaring.</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="route-head">
+          <h3 class="route-title">Op Android</h3>
+          <p class="route-note">Doe dit in Chrome, Edge of Samsung Internet.</p>
+        </div>
+
+        <ol class="steps">
+          <li class="step">
+            <span class="number">1</span>
+            <div>
+              <h3>Open Duikmonitor in je browser</h3>
+              <p>Ga naar <strong>duikmonitor.nl</strong> in Chrome, Edge of Samsung Internet. Zit je in WhatsApp of een andere app? Open de pagina dan eerst in je browser.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="number">2</span>
+            <div>
+              <h3>Open het menu</h3>
+              <p>Tik op het menu met de drie puntjes. Dat staat meestal rechtsboven of rechtsonder in de browser.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="number">3</span>
+            <div>
+              <h3>Kies “App installeren” of “Toevoegen aan startscherm”</h3>
+              <p>De tekst verschilt per browser. Kies de optie die Duikmonitor aan je startscherm toevoegt.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="number">4</span>
+            <div>
+              <h3>Bevestig</h3>
+              <p>Bevestig het toevoegen. Daarna staat Duikmonitor als icoon op je startscherm en open je hem rechtstreeks vanaf daar.</p>
             </div>
           </li>
         </ol>
@@ -1074,11 +1134,11 @@
 
         <article class="soft-card">
           <h2>Zie je de optie niet?</h2>
-          <p>Gebruik je een oudere iOS-versie, een andere browser of een browser-in-app scherm, dan kan de tekst anders zijn. De beste route blijft: open in Safari en kies “Zet op beginscherm”.</p>
+          <p>De tekst kan per toestel en browser anders zijn. Op iPhone en iPad blijft de beste route: open in Safari en kies “Zet op beginscherm”. Op Android open je de pagina in Chrome, Edge of Samsung Internet en kies je in het menu de installatieoptie.</p>
           <ul>
             <li><span class="check">✓</span><span>Op iPad kan de deelknop bovenin staan.</span></li>
-            <li><span class="check">✓</span><span>In apps zoals WhatsApp moet je vaak eerst “Open in Safari” kiezen.</span></li>
-            <li><span class="check">✓</span><span>Als “Open als webapp” ontbreekt, ga je gewoon door met “Voeg toe”.</span></li>
+            <li><span class="check">✓</span><span>In apps zoals WhatsApp kies je vaak eerst “Open in browser”.</span></li>
+            <li><span class="check">✓</span><span>Heet de optie op Android anders? Kies de keuze die de pagina aan je startscherm toevoegt.</span></li>
           </ul>
         </article>
       </section>
@@ -1137,8 +1197,10 @@
       const ua = navigator.userAgent || "";
       const platform = navigator.platform || "";
       const isIOS = /iPad|iPhone|iPod/.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const isAndroid = /Android/i.test(ua);
       const isStandalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
       const isSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|DuckDuckGo|OPiOS|Chrome|Chromium|Android/i.test(ua);
+      const isAndroidInstallBrowser = isAndroid && /Chrome|Chromium|EdgA|SamsungBrowser/i.test(ua);
 
       if (isStandalone) {
         statusText.innerHTML = "<strong>Duikmonitor lijkt al als beginschermapp te draaien.</strong> Je hoeft niets meer te installeren.";
@@ -1146,8 +1208,12 @@
         statusText.innerHTML = "<strong>Je zit goed:</strong> je gebruikt Safari op iPhone of iPad. Tik op de deelknop en kies “Zet op beginscherm”.";
       } else if (isIOS && !isSafari) {
         statusText.innerHTML = "<strong>Open deze pagina eerst in Safari.</strong> Gebruik daarna de deelknop en kies “Zet op beginscherm”.";
+      } else if (isAndroidInstallBrowser) {
+        statusText.innerHTML = "<strong>Je zit goed:</strong> open het menu met de drie puntjes en kies “App installeren” of “Toevoegen aan startscherm”.";
+      } else if (isAndroid) {
+        statusText.innerHTML = "<strong>Open deze pagina in Chrome, Edge of Samsung Internet.</strong> Kies daarna in het menu “App installeren” of “Toevoegen aan startscherm”.";
       } else {
-        statusText.innerHTML = "<strong>Deze uitleg is bedoeld voor iPhone en iPad.</strong> Open duikmonitor.nl op je toestel en gebruik Safari.";
+        statusText.innerHTML = "<strong>Open duikmonitor.nl op je telefoon of tablet.</strong> Op iPhone en iPad via Safari, op Android via Chrome, Edge of Samsung Internet.";
       }
 
       function showToast(message){
