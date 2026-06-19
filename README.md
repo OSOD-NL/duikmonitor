@@ -13,7 +13,7 @@ Een eenvoudige, **offline-first** webapplicatie om duiken te plannen, live te mo
 
 ## Status
 
-Actuele publicatieversie: **v1.3.0**. v1.0.0 was de eerste publieke release.
+Actuele publicatieversie: **v1.5.0**. v1.0.0 was de eerste publieke release.
 
 De app plant, monitort en registreert duiken met een gevalideerde DCIEM-rekenmotor tot en met 15 meter, binnen de gedocumenteerde no-deco scope. Ze maakt expliciet onderscheid tussen een losse duik in tabeldiepte 6, 9 of 12 m en een toegepaste 6-, 9- of 12-meterregel waarbij meerdere duikmomenten van dezelfde duiker worden opgeteld. Het duikerbeheer werkt met vaste slots D1 tot en met D12. Alle DCIEM-tabelwaarden zijn cel voor cel tegen de bron gecontroleerd. Bij elke start bewaakt de ingebouwde zelftest zowel de afgeleide rekenmotor als een vaste bronfingerprint/fixture, zodat ook een onbedoelde wijziging in de ingebouwde bron opvalt.
 
@@ -65,7 +65,7 @@ Zie `docs/ARCHITECTUUR.md` voor de opbouw van de app, de safety-kritieke functie
 
 ## OSOD-uitwisseling
 
-Duikmonitor v1.3.0 implementeert OSOD v0.1, niveau S+R, binnen scope: afgeronde operationele ademluchtduiken die door de Duikmonitor-registratielaag volledig en betekenisbehoudend worden gedragen. Buiten de rekenkundige envelop worden feiten geregistreerd en wordt geen geldige rekenuitkomst geleverd; zulke records vallen niet onder een geslaagde Niveau R-berekening.
+Duikmonitor implementeert OSOD v0.1, niveau S+R, binnen scope: afgeronde operationele ademluchtduiken die door de Duikmonitor-registratielaag volledig en betekenisbehoudend worden gedragen. Buiten de rekenkundige envelop worden feiten geregistreerd en wordt geen geldige rekenuitkomst geleverd; zulke records vallen niet onder een geslaagde Niveau R-berekening. De claim is gebonden aan de rekenbron: hij geldt zolang de sha256-rekenbronfingerprint in het verificatiescherm gelijk is aan de getoetste waarde in de conformiteitsverklaring.
 
 OSOD-import is beperkt tot records binnen de Duikmonitor-scope. Records buiten scope worden geweigerd en niet herschreven.
 

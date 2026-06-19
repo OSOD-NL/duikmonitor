@@ -4,7 +4,7 @@ Dit document beschrijft hoe de Duikmonitor de Open Standaard Operationele Duikre
 
 ## 1. Conformiteitsclaim
 
-Duikmonitor v1.3.0 implementeert OSOD v0.1, niveau S+R, binnen scope: afgeronde operationele ademluchtduiken die door de Duikmonitor-registratielaag volledig en betekenisbehoudend worden gedragen. Buiten de rekenkundige envelop worden feiten geregistreerd en wordt geen geldige rekenuitkomst geleverd; zulke records vallen niet onder een geslaagde Niveau R-berekening.
+Duikmonitor implementeert OSOD v0.1, niveau S+R, binnen scope: afgeronde operationele ademluchtduiken die door de Duikmonitor-registratielaag volledig en betekenisbehoudend worden gedragen. Buiten de rekenkundige envelop worden feiten geregistreerd en wordt geen geldige rekenuitkomst geleverd; zulke records vallen niet onder een geslaagde Niveau R-berekening. De claim is gebonden aan de rekenbron: hij geldt zolang de sha256-rekenbronfingerprint in het verificatiescherm gelijk is aan de getoetste waarde in de conformiteitsverklaring (hoofdstuk 6).
 
 OSOD-import is beperkt tot records binnen de Duikmonitor-scope. Records buiten scope worden geweigerd en niet herschreven.
 
