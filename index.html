@@ -120,6 +120,7 @@
       --locked-bg:rgba(2,6,23,.30);--locked-text:#e2e8f0;--locked-border:rgba(148,163,184,.22);
       --intro-live-line:rgba(56,189,248,.65);--intro-plan-line:rgba(96,165,250,.50);
       --installbar-bg:linear-gradient(135deg,#1B5566 0%,#0A2129 100%);--installbar-border:#E4572E;--installbar-text:#F4F8F9;--installbar-plus-border:#E4572E;--installbar-plus-text:#E4572E;
+      --updatebar-bg:linear-gradient(135deg,#1B5566 0%,#0A2129 100%);--updatebar-border:#E4572E;--updatebar-text:#F4F8F9;
     }
     /* Dag/Buiten: operationele leesmodus. Effen vlakken, donkere tekst op licht,
        duidelijke randen, harde statuskleuren. Geen gloed/gradient onder tekst. */
@@ -208,6 +209,7 @@
       --locked-bg:#f1f5f9;--locked-text:#0f172a;--locked-border:#94a3b8;
       --intro-live-line:#0369a1;--intro-plan-line:#1d4ed8;
       --installbar-bg:linear-gradient(135deg,#1B5566 0%,#0A2129 100%);--installbar-border:#E4572E;--installbar-text:#F4F8F9;--installbar-plus-border:#E4572E;--installbar-plus-text:#E4572E;
+      --updatebar-bg:linear-gradient(135deg,#1B5566 0%,#0A2129 100%);--updatebar-border:#E4572E;--updatebar-text:#F4F8F9;
     }
     /* THEME TOKENS END */
     *{box-sizing:border-box}
@@ -435,6 +437,10 @@
     details.installbar .installbar-body h3{margin:8px 0 2px;font-size:13px;color:var(--installbar-text)}
     details.installbar .installbar-body p{margin:2px 0;font-size:12px;color:var(--installbar-text)}
     body.is-standalone details.installbar{display:none}
+    #updateBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom, 0px) + 76px);z-index:60;max-width:calc(100% - 24px);display:none;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--updatebar-border);border-radius:999px;background:var(--updatebar-bg);color:var(--updatebar-text);font-weight:800;font-size:13px;cursor:pointer;text-align:left}
+    #updateBar.show{display:inline-flex}
+    #updateBar::before{content:"↻";display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;border:1px solid currentColor;font-weight:950;line-height:1;flex:0 0 auto}
+    @media print{#updateBar{display:none!important}}
     input.user.need-hint,select.user.need-hint,textarea.user.need-hint{border-color:var(--required-border);background:var(--required-bg);color:var(--required-text)}
     input.user.need-hint:focus,select.user.need-hint:focus,textarea.user.need-hint:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--focus-ring)}
     .tab[data-screen="liveScreen"].active,.bottomnav button[data-screen="liveScreen"].active{background:var(--tab-live-bg);border-color:var(--tab-live-border);color:var(--tab-live-text)}
@@ -565,11 +571,12 @@
 </main>
 <input aria-label="Importbestand (JSON) kiezen" id="importFile" type="file" accept="application/json" class="hide" />
 <input aria-label="OSOD-importbestand (JSON) kiezen" id="osodImportFile" type="file" accept="application/json" class="hide" />
+<button type="button" id="updateBar" class="no-print" aria-live="polite" hidden>Nieuwe versie beschikbaar, tik om te vernieuwen</button>
 <script>
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.9.0";
+  const APP_VERSION = "v1.10.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -3004,7 +3011,7 @@
       <div class="card span12"><h3>Opstijgingen en rust</h3><p class="note">Opstijgingen worden per duiker bewaakt per duikperiode van 4 uur en per duikdag. Tussen twee opstijgingen geldt minimaal 15 minuten oppervlakte-interval. Na een duikperiode van 4 uur geldt minimaal 1 uur rust.</p><div class="tablewrap"><table class="table"><thead><tr><th>Maximale diepte</th><th>Per 4 uur</th><th>Per dag</th><th>Bronlaag</th></tr></thead><tbody><tr><td>t/m 6 m</td><td>6</td><td>12</td><td>DMC-advies 2013</td></tr><tr><td>&gt;6 t/m 9 m</td><td>4</td><td>8</td><td>DMC-advies 2013</td></tr><tr><td>&gt;9 t/m 12 m</td><td>3</td><td>6</td><td>Conservatieve projectregel</td></tr><tr><td>&gt;12 t/m 15 m</td><td>3</td><td>3</td><td>WOD-regime / projectmatige borging</td></tr></tbody></table></div><div class="hint" style="margin-top:10px"><b>Waarom deze extra laag?</b><br>DCIEM beoordeelt diepte, duiktijd, oppervlakte-interval, HG/HF en no-deco-grenzen. De 6-/9-/12-meterregel maakt meerdere ondiepe duikmomenten eenvoudiger planbaar als één samengestelde duik, maar geeft geen onbeperkte ruimte voor herhaald afdalen en opstijgen. Daarom bewaakt de monitor ook het aantal opstijgingen per duikperiode en per duikdag.</div><p class="small muted">Bronnuance: DMC noemt 6 m en 9 m expliciet. De categorie &gt;9 t/m 12 m is een conservatieve projectregel. De categorie &gt;12 t/m 15 m volgt uit het WOD-regime voor duiken dieper dan 12 m en projectmatige borging. DCIEM-grenzen, OI-eisen en opstijgingslimieten gelden naast elkaar; de meest beperkende grens is leidend.</p></div>
       <div class="card span6"><h3>Opkomstvenster</h3><p class="note">Gebaseerd op 18 ± 3 meter per minuut: snelste 21 m/min, nominaal 18 m/min, langzaamste 15 m/min. Live-metingen worden op seconden gecontroleerd.</p><div class="tablewrap"><table class="table"><thead><tr><th>MDD</th><th>Venster</th><th>Nominaal</th></tr></thead><tbody>${[6,9,12,15].map(d=>{const w=ascentWindow(d);return `<tr><td>${d} m</td><td>${fmtSecs(w.min)}-${fmtSecs(w.max)}</td><td>${fmtSecs(w.nominal)}</td></tr>`}).join("")}</tbody></table></div></div>
       <div class="card span6"><h3>Ademluchtbewaking</h3><p class="note">Actieve duiken kunnen tussentijds luchtmetingen vastleggen. De monitor gebruikt standaard 2×4 L, rekent resterende tijd tot 100 bar en kiest automatisch het juiste drukcheck-interval.</p><div class="hint">De hoogste waarde van verbruik sinds start en sinds de vorige meting wordt gebruikt.</div></div>
-      <div class="card span12"><h3>Privacy en lokaal gebruik</h3><p class="note">De monitor rekent in de browser op dit apparaat. Ingevoerde gegevens worden niet automatisch naar een server verzonden.</p><p class="note">Er is geen account, geen centrale database en geen automatische synchronisatie. Gegevens blijven lokaal in de browser, tenzij de gebruiker ze zelf exporteert, print, kopieert of deelt.</p><div class="hint">De appbestanden kunnen via duikmonitor.nl of als lokaal bestand worden geopend. Ingevulde duikgegevens en berekeningen worden door de app niet naar GitHub, de beheerder of een eigen server verzonden. Bij het openen van een openbare website kan de hostinglaag wel normale technische requestgegevens ontvangen; dat staat los van de lokale appdata.</div></div>
+      <div class="card span12"><h3>Privacy en lokaal gebruik</h3><p class="note">De monitor rekent in de browser op dit apparaat. Ingevoerde gegevens worden niet automatisch naar een server verzonden.</p><p class="note">Er is geen account, geen centrale database en geen automatische synchronisatie. Gegevens blijven lokaal in de browser, tenzij de gebruiker ze zelf exporteert, print, kopieert of deelt.</p><div class="hint">De appbestanden kunnen via duikmonitor.nl of als lokaal bestand worden geopend. Ingevulde duikgegevens en berekeningen worden door de app niet naar GitHub, de beheerder of een eigen server verzonden. Bij het openen van een openbare website kan de hostinglaag wel normale technische requestgegevens ontvangen; dat staat los van de lokale appdata.</div><h4 style="margin-top:12px;">Versiemelding</h4><p class="note">Duikmonitor vraagt af en toe aan de eigen server welke versie de nieuwste is. Er gaat niets van jou mee; geen gegevens, geen Google, geen andere diensten. Verschijnt onderin de melding dat er een nieuwe versie is, dan beslis je zelf of je vernieuwt. Zonder die tik blijft alles staan.</p></div>
     </div>`;
     document.getElementById("openSelftest").onclick=()=>{currentScreen="selftestScreen";render();};
     const backBtn = document.getElementById("backToSettingsFromRules");
@@ -3425,7 +3432,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.9.0", APP_VERSION, APP_VERSION==="v1.9.0");
+    push("basis","Appversielabel", "v1.10.0", APP_VERSION, APP_VERSION==="v1.10.0");
     // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
     // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
     // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
@@ -3484,6 +3491,101 @@
         detail.join(" "),
         alleOk);
     })();
+    // UI-interactietest (B-0024) voor de updatecheck/versiemelding. Doet de echte
+    // beslissing na via applyFetchedVersion() en controleert de GERENDERDE balk
+    // (#updateBar: klasse "show" en hidden-vlag), niet alleen een interne variabele.
+    // Dekt: nieuwere versie toont de melding, gelijke/oudere versie niet, een waarde
+    // buiten het versiepatroon niet (domme-string-grendel), de tik koppelt aan de
+    // herlaad-actie, en een negatieve/tautologie-grendel.
+    (function(){
+      const barEl = (typeof document !== "undefined" && document.getElementById)
+        ? document.getElementById("updateBar") : null;
+      if(!barEl){
+        push("ui","Versiemelding: verschijnt alleen bij een echt nieuwere versie en herlaadt op de tik",
+          "updateBar-element aanwezig","updateBar ontbreekt",false);
+        return;
+      }
+      const zichtbaar = (el) => el.classList.contains("show") && el.hidden === false;
+      const detail = [];
+      let alleOk = true;
+      try{
+        hideUpdateBar();
+        // Nieuwere versie: melding verschijnt echt in de gerenderde balk.
+        const rNieuw = applyFetchedVersion("v1.10.1");
+        const nieuwerToont = rNieuw === "nieuwer" && zichtbaar(barEl);
+        detail.push(`nieuwer[status=${rNieuw} zichtbaar=${zichtbaar(barEl)}]`);
+        alleOk = alleOk && nieuwerToont;
+        // Gelijke versie: geen melding, balk verborgen.
+        const rGelijk = applyFetchedVersion(APP_VERSION);
+        const gelijkVerbergt = rGelijk === "nietNieuwer" && !zichtbaar(barEl);
+        detail.push(`gelijk[status=${rGelijk} zichtbaar=${zichtbaar(barEl)}]`);
+        alleOk = alleOk && gelijkVerbergt;
+        // Oudere versie: geen melding.
+        applyFetchedVersion("v1.10.1");
+        const rOud = applyFetchedVersion("v1.8.0");
+        const ouderVerbergt = rOud === "nietNieuwer" && !zichtbaar(barEl);
+        detail.push(`ouder[status=${rOud} zichtbaar=${zichtbaar(barEl)}]`);
+        alleOk = alleOk && ouderVerbergt;
+        // Domme-string-grendel: een waarde buiten het versiepatroon toont niets, ook
+        // niet na een staat waarin de melding zichtbaar was.
+        applyFetchedVersion("v1.10.1");
+        const rGieftig = applyFetchedVersion("<img src=x onerror=alert(1)>");
+        const grendelWerkt = rGieftig === "ongeldig" && !zichtbaar(barEl);
+        detail.push(`grendel[status=${rGieftig} zichtbaar=${zichtbaar(barEl)}]`);
+        alleOk = alleOk && grendelWerkt;
+        // Niet-versievormige numerieke onzin wordt ook geweigerd.
+        applyFetchedVersion("v1.10.1");
+        const rOnzin = applyFetchedVersion("1.10.1");
+        const onzinGeweigerd = rOnzin === "ongeldig" && !zichtbaar(barEl);
+        detail.push(`zondervee[status=${rOnzin} zichtbaar=${zichtbaar(barEl)}]`);
+        alleOk = alleOk && onzinGeweigerd;
+        // Tik koppelt aantoonbaar aan de herlaad-actie. De event-listener van de balk
+        // roept handleUpdateBarClick aan; die roept triggerReload aan. We onderscheppen
+        // triggerReload en roepen dezelfde handeler aan. De echte herlading hoeft niet
+        // plaats te vinden; de koppeling is wat wordt aangetoond.
+        let reloadAangeroepen = 0;
+        const realTrigger = triggerReload;
+        try{
+          triggerReload = () => { reloadAangeroepen++; };
+          handleUpdateBarClick();
+        }catch(e){ detail.push("reload-stub uitzondering: " + (e && e.message ? e.message : String(e))); }
+        finally{ triggerReload = realTrigger; }
+        const tikHerlaadt = reloadAangeroepen === 1;
+        detail.push(`tik[reloadAangeroepen=${reloadAangeroepen}]`);
+        alleOk = alleOk && tikHerlaadt;
+        // Negatieve grendel tegen tautologie: als de "nieuwer" en "ongeldig" tak
+        // hetzelfde zouden doen, zou onderstaande gelijk zijn. De test eist juist dat
+        // een nieuwere versie WEL en een ongeldige NIET toont; deze controle faalt
+        // zodra de meldingslogica wegvalt of beide takken samenvallen.
+        applyFetchedVersion("v1.10.1");
+        const toontBijNieuw = zichtbaar(barEl);
+        applyFetchedVersion("rommel");
+        const toontBijRommel = zichtbaar(barEl);
+        const grendelOnderscheidt = toontBijNieuw === true && toontBijRommel === false;
+        detail.push(`onderscheid[nieuw=${toontBijNieuw} rommel=${toontBijRommel}]`);
+        alleOk = alleOk && grendelOnderscheidt;
+      }catch(e){
+        alleOk = false;
+        detail.push("uitzondering: " + (e && e.message ? e.message : String(e)));
+      }finally{
+        try{ hideUpdateBar(); }catch(e){ /* herstel best effort */ }
+      }
+      push("ui","Versiemelding: verschijnt alleen bij een strikt nieuwere versie, grendel weert ongeldige waarde, tik herlaadt",
+        "nieuwer=zichtbaar; gelijk/ouder=verborgen; ongeldig=verborgen; tik=reload 1x",
+        detail.join(" "),
+        alleOk);
+    })();
+    // Versievergelijking is numeriek per onderdeel, niet als tekst. Borgt dat v1.10.0
+    // nieuwer is dan v1.9.0 (waar tekstvergelijking "1.9" > "1.10" fout zou geven).
+    push("basis","Updatecheck: versievergelijking is numeriek per onderdeel",
+      "v1.10.0>v1.9.0 en v1.9.0<v1.10.0",
+      `${compareAppVersions("v1.10.0","v1.9.0")>0}/${compareAppVersions("v1.9.0","v1.10.0")<0}/${compareAppVersions("v1.10.0","v1.10.0")===0}`,
+      compareAppVersions("v1.10.0","v1.9.0")>0 && compareAppVersions("v1.9.0","v1.10.0")<0 && compareAppVersions("v1.10.0","v1.10.0")===0);
+    // Versiepatroon-grendel op datalaagniveau: alleen v gevolgd door cijfergroepen.
+    push("basis","Updatecheck: versiepatroon weigert niet-versievormige waarde",
+      "v1.10.0 ok; rommel/HTML/zonder-v geweigerd",
+      `${UPDATE_VERSION_RE.test("v1.10.0")}/${!UPDATE_VERSION_RE.test("1.10.0")}/${!UPDATE_VERSION_RE.test("<img>")}/${!UPDATE_VERSION_RE.test("vX")}`,
+      UPDATE_VERSION_RE.test("v1.10.0") && !UPDATE_VERSION_RE.test("1.10.0") && !UPDATE_VERSION_RE.test("<img>") && !UPDATE_VERSION_RE.test("vX"));
     // Viewport-meta moet maximum-scale=1 bevatten zodat iOS Safari niet op invoervelden
     // inzoomt en na kantelen niet uitvergroot blijft. In de browser wordt de gerenderde
     // meta-tag uit de <head> gelezen; in de Node-runner staat de <head> buiten het inline
@@ -5366,8 +5468,94 @@
     }
   }
   setInterval(updateLiveDynamicParts, 1000);
+
+  // Updatecheck (versiemelding). Terughoudend: alleen op het zichtbaar-worden-moment,
+  // nooit tijdens een lopende sessie, nooit automatisch herladen. De app vraagt het
+  // eigen domein (version.json, relatief pad, same-origin) welke versie nu staat en
+  // toont alleen een rustige, niet-blokkerende melding wanneer die strikt nieuwer is
+  // dan APP_VERSION. De opgehaalde waarde wordt als domme string behandeld: nooit
+  // uitgevoerd, nooit als HTML/innerHTML in de pagina gezet, alleen vergeleken.
+  const UPDATE_VERSION_RE = /^v\d+(\.\d+)*$/;
+  function parseVersionParts(v){
+    return String(v).slice(1).split(".").map(n => parseInt(n, 10));
+  }
+  // Echte versievergelijking, numeriek per onderdeel. >0 als a nieuwer is dan b.
+  function compareAppVersions(a, b){
+    const pa = parseVersionParts(a), pb = parseVersionParts(b);
+    const len = Math.max(pa.length, pb.length);
+    for(let i = 0; i < len; i++){
+      const x = pa[i] || 0, y = pb[i] || 0;
+      if(x > y) return 1;
+      if(x < y) return -1;
+    }
+    return 0;
+  }
+  function updateBarEl(){
+    return (typeof document !== "undefined" && document.getElementById)
+      ? document.getElementById("updateBar") : null;
+  }
+  function showUpdateBar(){
+    const el = updateBarEl();
+    if(!el) return;
+    el.hidden = false;
+    el.classList.add("show");
+  }
+  function hideUpdateBar(){
+    const el = updateBarEl();
+    if(!el) return;
+    el.classList.remove("show");
+    el.hidden = true;
+  }
+  // Beslis op grond van een opgehaalde waarde of de melding verschijnt. Pure
+  // render-beslissing: valideer vorm, vergelijk met APP_VERSION, toon of verberg de
+  // balk. Retourneert een korte status voor de zelftest. Een waarde die niet aan het
+  // versienummer-patroon voldoet, leidt hooguit tot "geen melding".
+  function applyFetchedVersion(raw){
+    if(typeof raw !== "string" || !UPDATE_VERSION_RE.test(raw)){
+      hideUpdateBar();
+      return "ongeldig";
+    }
+    if(compareAppVersions(raw, APP_VERSION) > 0){
+      showUpdateBar();
+      return "nieuwer";
+    }
+    hideUpdateBar();
+    return "nietNieuwer";
+  }
+  // Haal version.json same-origin op en geef de waarde door aan applyFetchedVersion.
+  // Alle fouten (offline, time-out, netwerkfout, ontbrekend bestand, ongeldige inhoud)
+  // worden stil afgevangen: geen foutmelding, geen storende console-ruis, de app gaat
+  // door en probeert het opnieuw bij het volgende zichtbaar-worden-moment.
+  function checkForUpdate(){
+    try{
+      if(typeof fetch !== "function") return;
+      fetch("version.json", {cache:"no-store"})
+        .then(r => (r && r.ok) ? r.json() : null)
+        .then(data => {
+          const v = data && typeof data.version === "string" ? data.version : null;
+          if(v !== null) applyFetchedVersion(v);
+        })
+        .catch(() => { /* stil: geen melding, app gaat door */ });
+    }catch(e){ /* stil: nooit de app blokkeren op een updatecheck */ }
+  }
+  // De herlaad-actie zit in een aparte functie zodat de tik aantoonbaar aan de
+  // herlading is gekoppeld en de koppeling in de zelftest controleerbaar is zonder
+  // dat de pagina echt herlaadt.
+  let triggerReload = function(){
+    if(typeof location !== "undefined" && typeof location.reload === "function") location.reload();
+  };
+  // De klikhandeler van de balk. De event-listener roept exact deze functie aan, en de
+  // zelftest roept dezelfde functie aan met een onderschepte triggerReload; zo is de
+  // koppeling tik -> herladen aantoonbaar, ook in de Node-runner waar de DOM-klik niet
+  // echt vuurt en location ontbreekt.
+  function handleUpdateBarClick(){ triggerReload(); }
   if(typeof document !== "undefined"){
-    document.addEventListener("visibilitychange",()=>{ if(!document.hidden) updateLiveDynamicParts(); });
+    const ub = updateBarEl();
+    if(ub) ub.addEventListener("click", handleUpdateBarClick);
+  }
+
+  if(typeof document !== "undefined"){
+    document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ updateLiveDynamicParts(); checkForUpdate(); } });
   }
 
   if(typeof window !== "undefined"){
@@ -5393,6 +5581,7 @@
   applyStandaloneClass();
   runBootGate();
   render();
+  checkForUpdate();
 })();
 </script>
 </body>
