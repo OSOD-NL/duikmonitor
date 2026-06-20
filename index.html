@@ -569,7 +569,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.8.0";
+  const APP_VERSION = "v1.9.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -2161,7 +2161,13 @@
     el.classList.remove("ok","warn","bad","neutral");
     if(bootGate.status === "green"){
       el.classList.add("ok");
-      el.textContent = `geverifieerd ${bootGate.passed}/${bootGate.total} · ${APP_VERSION}`;
+      // Groene stand toont een vinkje in plaats van het woord "geverifieerd", zodat de
+      // bovenrij op smalle schermen op een regel past. Vaste, eigen opbouw: alleen interne,
+      // niet door de gebruiker gevulde waarden (telling number-gecoerced, versie via esc).
+      const passed = Number(bootGate.passed);
+      const total = Number(bootGate.total);
+      el.textContent = "";
+      el.innerHTML = `<span class="verify-check" aria-label="geverifieerd">✓</span> ${passed}/${total} · ${esc(APP_VERSION)}`;
       el.title = "Rekenmotor bij opstarten geverifieerd: alle kritieke controles geslaagd.";
     } else if(bootGate.status === "amber"){
       el.classList.add("warn");
@@ -3419,7 +3425,65 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.8.0", APP_VERSION, APP_VERSION==="v1.8.0");
+    push("basis","Appversielabel", "v1.9.0", APP_VERSION, APP_VERSION==="v1.9.0");
+    // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
+    // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
+    // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
+    // de drie standen. We zetten bootGate tijdelijk en herstellen hem daarna.
+    (function(){
+      const badgeEl = (typeof document !== "undefined" && document.getElementById)
+        ? document.getElementById("verifyBadge") : null;
+      if(!badgeEl){
+        push("ui","Boot-gate-badge: groen vinkje, oranje en rood behouden tekst",
+          "verifyBadge-element aanwezig","verifyBadge ontbreekt",false);
+        return;
+      }
+      const savedGate = bootGate;
+      const rendered = (el) => `${el.innerHTML || ""} ${el.textContent || ""}`;
+      const detail = [];
+      let alleOk = true;
+      try {
+        // Groene stand: vinkje aanwezig, zichtbaar woord "geverifieerd" weg, aria-label
+        // bevat het woord wel, telling en versie staan in de badge.
+        bootGate = { status:"green", passed:370, total:370, nonCritFail:0, critFail:0, failedCritical:[] };
+        updateVerifyBadge();
+        const g = rendered(badgeEl);
+        const ariaTag = 'aria-label="geverifieerd"';
+        const gZonderAria = g.split(ariaTag).join("");
+        const groenGeenZichtbaarWoord = !gZonderAria.includes("geverifieerd");
+        const groenVinkje = g.includes("\u2713");
+        const groenAria = g.includes(ariaTag);
+        const groenTelling = g.includes("370/370");
+        const groenVersie = g.includes(APP_VERSION);
+        const groenOk = groenGeenZichtbaarWoord && groenVinkje && groenAria && groenTelling && groenVersie;
+        detail.push(`groen[vinkje=${groenVinkje} aria=${groenAria} telling=${groenTelling} versie=${groenVersie} geenWoord=${groenGeenZichtbaarWoord}]`);
+        alleOk = alleOk && groenOk;
+        // Oranje stand: tekst behouden.
+        bootGate = { status:"amber", passed:369, total:370, nonCritFail:1, critFail:0, failedCritical:[] };
+        updateVerifyBadge();
+        const a = rendered(badgeEl);
+        const oranjeOk = a.includes("kern OK") && a.includes("niet-kritieke melding(en)");
+        detail.push(`oranje[kernOK=${a.includes("kern OK")} melding=${a.includes("niet-kritieke melding(en)")}]`);
+        alleOk = alleOk && oranjeOk;
+        // Rode stand: tekst behouden.
+        bootGate = { status:"red", passed:0, total:370, nonCritFail:0, critFail:2, failedCritical:["x","y"] };
+        updateVerifyBadge();
+        const r = rendered(badgeEl);
+        const roodOk = r.includes("NIET GEVERIFIEERD") && r.includes("kritieke fout(en)");
+        detail.push(`rood[nietGeverifieerd=${r.includes("NIET GEVERIFIEERD")} fout=${r.includes("kritieke fout(en)")}]`);
+        alleOk = alleOk && roodOk;
+      } catch(e){
+        alleOk = false;
+        detail.push("uitzondering: " + (e && e.message ? e.message : String(e)));
+      } finally {
+        bootGate = savedGate;
+        try { updateVerifyBadge(); } catch(e){ /* herstel-render best effort */ }
+      }
+      push("ui","Boot-gate-badge: groene stand toont vinkje (aria geverifieerd), oranje en rood behouden hun tekst",
+        "groen=vinkje zonder zichtbaar woord; oranje=kern OK; rood=NIET GEVERIFIEERD",
+        detail.join(" "),
+        alleOk);
+    })();
     // Viewport-meta moet maximum-scale=1 bevatten zodat iOS Safari niet op invoervelden
     // inzoomt en na kantelen niet uitvergroot blijft. In de browser wordt de gerenderde
     // meta-tag uit de <head> gelezen; in de Node-runner staat de <head> buiten het inline

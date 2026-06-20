@@ -2,6 +2,20 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.9.0] - 2026-06-20
+
+De statusbalk bovenin springt op een iPhone in staande stand niet langer op en neer bij elke opslag.
+
+### Gewijzigd
+
+- De groene verificatiestand bovenin toont nu een groen vinkje in plaats van het woord "geverifieerd". Daardoor past de bovenrij ook in rust op een regel en blijft de inhoud eronder staan tijdens het opslaan. De telling en het versienummer blijven zichtbaar; een schermlezer leest nog steeds "geverifieerd" voor.
+- Appversielabel verhoogd naar v1.9.0; de bijbehorende zelftest controleert mee op v1.9.0.
+- Het opstart-zelftal gaat van 370 naar 371 door een nieuwe zelftest die de drie standen van de verificatiebadge in de gerenderde balk controleert.
+
+### Niet gewijzigd
+
+- De oranje en de rode waarschuwingsstand houden hun volledige tekst, omdat dat de zeldzame standen zijn die juist moeten opvallen. De pil "Lokaal opgeslagen" blijft ongewijzigd. Rekenkern, tabelwaarden, blokkeerlogica, statussemantiek, validatie en schema zijn niet aangeraakt. site.webmanifest, _headers en de iconen blijven byte-identiek.
+
 ## [1.8.0] - 2026-06-20
 
 Op iPhone zoomt de app niet meer in bij het aanraken van een invoerveld en blijft het scherm na kantelen naar liggende stand niet langer uitvergroot.
