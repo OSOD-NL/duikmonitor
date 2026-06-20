@@ -2,6 +2,26 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.10.0] - 2026-06-21
+
+De app merkt voortaan zelf op wanneer er een nieuwere versie klaarstaat en biedt aan om te vernieuwen, zonder ooit ongevraagd te herladen.
+
+### Toegevoegd
+
+- Een rustige versiemelding. Wanneer de app weer zichtbaar wordt nadat hij even is weggeweest, vraagt hij aan de eigen server welk versienummer nu het nieuwste is. Staat er een nieuwere versie klaar, dan verschijnt onderin een tikbare melding "Nieuwe versie beschikbaar, tik om te vernieuwen". De app herlaadt uitsluitend na een tik van de gebruiker, nooit vanzelf, zodat een lopende registratie nooit wordt onderbroken. Offline of bij een storing gebeurt er niets storends; de melding blijft dan gewoon weg.
+- Een korte uitleg bij de versiemelding in het instellingengedeelte onder Privacy en lokaal gebruik. Er gaan bij deze controle geen gegevens mee; alleen het versienummer wordt opgehaald en vergeleken.
+- Een nieuw bestand version.json in de hoofdmap met uitsluitend het versienummer. Dit bestand schuift bij elke nieuwe versie mee.
+
+### Gewijzigd
+
+- De beveiligingsinstelling voor uitgaande verbindingen staat nu toe dat de app het eigen versiebestand ophaalt. Verbindingen naar andere domeinen blijven geblokkeerd; er is geen tracking, geen externe bron en geen synchronisatie.
+- Appversielabel verhoogd naar v1.10.0; de bijbehorende zelftest controleert mee op v1.10.0.
+- Het opstart-zelftal gaat van 371 naar 374 door nieuwe zelftests die de versiemelding controleren: de melding verschijnt alleen bij een echt nieuwere versie, een onverwachte waarde leidt nooit tot een melding, en de tik is gekoppeld aan het vernieuwen.
+
+### Niet gewijzigd
+
+- Rekenkern, tabelwaarden, blokkeerlogica, statussemantiek, validatie en schema zijn niet aangeraakt. De versiemelding staat daar volledig los van. site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.9.0] - 2026-06-20
 
 De statusbalk bovenin springt op een iPhone in staande stand niet langer op en neer bij elke opslag.
