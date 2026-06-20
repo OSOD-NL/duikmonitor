@@ -2,25 +2,6 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
-## [1.7.0] - 2026-06-20
-
-Veiligheidsregio wordt een keuzelijst met de officiele regio's, met een vangnet voor afwijkende waarden en een ruimere tekenlimiet.
-
-### Toegevoegd
-
-- Keuzelijst voor Veiligheidsregio met de 25 officiele veiligheidsregio's. Elke optie toont de regiocode plus de naam; opgeslagen wordt uitsluitend de code. Een leidende optie houdt het veld leeg tot er een keuze is gemaakt, zodat een nieuw record echt leeg blijft.
-- Optie "anders" met een vrij tekstveld als vangnet voor waarden buiten de lijst, zoals een samenwerkingsverband of een afwijkende geimporteerde naam. Een geladen of geimporteerde waarde die geen van de 25 codes is, valt automatisch terug op "anders" en blijft volledig behouden; er wordt nooit stilzwijgend gewist of vervangen.
-
-### Gewijzigd
-
-- De tekstwaarde voor Veiligheidsregio (de "anders"-tekst en de sanitatie bij laden) heeft nu een eigen tekenlimiet van 40, passend bij het getoonde invoervak. Hierdoor verdwijnt de eerdere stille afkapping op 25 en blijven langere namen volledig bewaard. De grens voor Post/Ploeg blijft 25.
-- Appversielabel verhoogd naar v1.7.0; de bijbehorende zelftest-assertie controleert mee op v1.7.0. Het opstart-zelftal gaat van 361 naar 368 door nieuwe UI-, round-trip- en lengtetests voor de veiligheidsregio.
-
-### Niet gewijzigd
-
-- De OSOD-standaard en het schema blijven ongewijzigd: context.veiligheidsregio blijft een vrije niet-lege string, zonder enum of regiolijst. De keuzelijst en de tekenlimiet beperken uitsluitend de invoer in de app. De geexporteerde datavorm blijft gelijk.
-- Rekenkern, tabelwaarden, blokkeerlogica, statussemantiek en toetsvectoren zijn niet aangeraakt. site.webmanifest, _headers en de iconen blijven ongemoeid.
-
 ## [1.6.0] - 2026-06-19
 
 Installatiestrook in de app toegevoegd; de losse webclip-pagina is vervallen.
