@@ -569,7 +569,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.6.0";
+  const APP_VERSION = "v1.7.0";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
   const ISSUE_URL = "https://github.com/OSOD-NL/duikmonitor/issues/new/choose";
@@ -1009,6 +1009,7 @@
   const MAX_LOCATION_CHARS = 25;
   const MAX_POST_CHARS = 25;
   const MAX_DPL_CHARS = 8;
+  const MAX_VEILIGHEIDSREGIO_CHARS = 40;
   const MAX_DIVER_LABEL_CHARS = 8;
   const MAX_SIGNAL_HOLDER_CHARS = 8;
   const cleanText = (value, max) => String(value ?? "").replace(/[\u0000-\u001F\u007F]+/g," ").replace(/\s+/g," ").trim().slice(0,max);
@@ -1020,9 +1021,39 @@
   const cleanSignalHolder = value => cleanText(value,MAX_SIGNAL_HOLDER_CHARS);
   const cleanRole = value => cleanText(value,40);
   const cleanProjectText = value => cleanText(value,MAX_POST_CHARS);
+  const cleanVeiligheidsregio = value => cleanText(value,MAX_VEILIGHEIDSREGIO_CHARS);
   const cleanDpl = value => cleanText(value,MAX_DPL_CHARS);
   const cleanLocation = value => cleanText(value,MAX_LOCATION_CHARS);
   const cleanMaterial = value => String(value ?? "").replace(/\D/g,"").slice(0,2);
+  const VEILIGHEIDSREGIOS = [
+    {code:"VR01", naam:"Groningen"},
+    {code:"VR02", naam:"Fryslan"},
+    {code:"VR03", naam:"Drenthe"},
+    {code:"VR04", naam:"IJsselland"},
+    {code:"VR05", naam:"Twente"},
+    {code:"VR06", naam:"Noord- en Oost-Gelderland"},
+    {code:"VR07", naam:"Gelderland-Midden"},
+    {code:"VR08", naam:"Gelderland-Zuid"},
+    {code:"VR09", naam:"Utrecht"},
+    {code:"VR10", naam:"Noord-Holland Noord"},
+    {code:"VR11", naam:"Zaanstreek-Waterland"},
+    {code:"VR12", naam:"Kennemerland"},
+    {code:"VR13", naam:"Amsterdam-Amstelland"},
+    {code:"VR14", naam:"Gooi en Vechtstreek"},
+    {code:"VR15", naam:"Haaglanden"},
+    {code:"VR16", naam:"Hollands Midden"},
+    {code:"VR17", naam:"Rotterdam-Rijnmond"},
+    {code:"VR18", naam:"Zuid-Holland Zuid"},
+    {code:"VR19", naam:"Zeeland"},
+    {code:"VR20", naam:"Midden- en West-Brabant"},
+    {code:"VR21", naam:"Brabant-Noord"},
+    {code:"VR22", naam:"Brabant-Zuidoost"},
+    {code:"VR23", naam:"Limburg-Noord"},
+    {code:"VR24", naam:"Zuid-Limburg"},
+    {code:"VR25", naam:"Flevoland"}
+  ];
+  const VEILIGHEIDSREGIO_CODES = new Set(VEILIGHEIDSREGIOS.map(v=>v.code));
+  const isVeiligheidsregioCode = value => VEILIGHEIDSREGIO_CODES.has(String(value ?? ""));
   const cleanMddValue = (value, {clamp=false, fallback=""}={}) => {
     const n = parseNum(value);
     if(!Number.isFinite(n) || n <= 0) return fallback;
@@ -1242,7 +1273,7 @@
     state.project.location = cleanLocation(state.project.location || "");
     state.project.post = cleanProjectText(state.project.post || "");
     state.project.dpl = cleanDpl(state.project.dpl || "");
-    state.project.veiligheidsregio = cleanProjectText(state.project.veiligheidsregio || "").slice(0,40);
+    state.project.veiligheidsregio = cleanVeiligheidsregio(state.project.veiligheidsregio || "");
     state.project.activiteitType = ["oefening","inzet","training","reintegratie","anders"].includes(state.project.activiteitType) ? state.project.activiteitType : "oefening";
     if(state.project.duiksysteem === "OLV") state.project.duiksysteem = "SCUBA_OLV";
     state.project.duiksysteem = ["SCUBA","SCUBA_OLV","SSE","anders","onbekend"].includes(state.project.duiksysteem) ? state.project.duiksysteem : "SCUBA";
@@ -2193,6 +2224,21 @@
     wireGlobalButtons();
   }
 
+  function veiligheidsregioField(){
+    const huidig = state.project.veiligheidsregio || "";
+    const isCode = isVeiligheidsregioCode(huidig);
+    const modeAnders = huidig !== "" && !isCode;
+    const placeholderSel = huidig === "" ? " selected" : "";
+    const andersSel = modeAnders ? " selected" : "";
+    const opties = `<option value=""${placeholderSel}>Kies veiligheidsregio</option>`
+      + VEILIGHEIDSREGIOS.map(v=>`<option value="${v.code}" ${huidig===v.code?'selected':''}>${esc(v.code+" "+v.naam)}</option>`).join("")
+      + `<option value="anders"${andersSel}>anders</option>`;
+    const select = `<div class="f4"><label>Veiligheidsregio</label><select aria-label="Veiligheidsregio" class="user" data-project="veiligheidsregio">${opties}</select></div>`;
+    const andersVeld = modeAnders
+      ? `<div class="f4"><label>Veiligheidsregio (anders)</label><input aria-label="Veiligheidsregio anders" class="user" maxlength="40" value="${esc(huidig)}" data-project-vr-other></div>`
+      : "";
+    return select + andersVeld;
+  }
   function projectBlock(){
     ensureDayparts();
     const requiredClass = value => String(value ?? "").trim() ? "" : " need-hint";
@@ -2208,7 +2254,7 @@
         <div class="f4"><label>Locatie</label><input aria-label="Locatie" class="user${requiredClass(state.project.location)}" maxlength="25" value="${esc(state.project.location)}" data-project="location" data-required-project></div>
         <div class="f3"><label>Post/Ploeg</label><input aria-label="Post/Ploeg" class="user${requiredClass(state.project.post)}" maxlength="25" value="${esc(state.project.post||'')}" data-project="post" data-required-project></div>
         <div class="f2"><label>DPL</label><input aria-label="DPL" class="user${requiredClass(state.project.dpl)}" maxlength="8" value="${esc(state.project.dpl)}" data-project="dpl" data-required-project></div>
-        <div class="f4"><label>Veiligheidsregio</label><input aria-label="Veiligheidsregio" class="user" maxlength="40" value="${esc(state.project.veiligheidsregio||'')}" data-project="veiligheidsregio"></div>
+        ${veiligheidsregioField()}
         <div class="f3"><label>Activiteittype</label><select aria-label="Activiteittype" class="user" data-project="activiteitType">${["oefening","inzet","training","reintegratie","anders"].map(v=>`<option value="${v}" ${state.project.activiteitType===v?'selected':''}>${v}</option>`).join("")}</select></div>
         <div class="f3"><label>Duiksysteem</label><select aria-label="Duiksysteem" class="user" data-project="duiksysteem">${["SCUBA","SCUBA_OLV","SSE","anders","onbekend"].map(v=>`<option value="${v}" ${state.project.duiksysteem===v?'selected':''}>${v}</option>`).join("")}</select></div>
       </div>
@@ -2249,11 +2295,22 @@
         } else if(inp.dataset.project === "dpl"){
           state.project.dpl = cleanDpl(inp.value);
           inp.value = state.project.dpl;
+        } else if(inp.dataset.project === "veiligheidsregio"){
+          const keuze = inp.value;
+          if(keuze === "anders"){
+            const huidig = state.project.veiligheidsregio || "";
+            state.project.veiligheidsregio = isVeiligheidsregioCode(huidig) ? "" : cleanVeiligheidsregio(huidig);
+          } else {
+            state.project.veiligheidsregio = isVeiligheidsregioCode(keuze) ? keuze : "";
+          }
         } else {
           state.project[inp.dataset.project]=inp.value;
         }
       });
     });
+    document.querySelectorAll("[data-project-vr-other]").forEach(inp=>inp.onchange=()=>mutate(()=>{
+      state.project.veiligheidsregio = cleanVeiligheidsregio(inp.value);
+    }));
     document.querySelectorAll("[data-daypart-code]").forEach(sel=>sel.onchange=()=>mutate(()=>{
       ensureDayparts();
       state.project.dayparts[normalizeDaypart(sel.dataset.daypartCode)].codes[Number(sel.dataset.codeIndex)] = sel.value;
@@ -3362,7 +3419,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.6.0", APP_VERSION, APP_VERSION==="v1.6.0");
+    push("basis","Appversielabel", "v1.7.0", APP_VERSION, APP_VERSION==="v1.7.0");
     push("basis","Publieke website-url", "https://duikmonitor.nl/", PUBLIC_APP_URL, PUBLIC_APP_URL==="https://duikmonitor.nl/");
     push("basis","GitHub repository-url", "https://github.com/OSOD-NL/duikmonitor", REPO_URL, REPO_URL==="https://github.com/OSOD-NL/duikmonitor");
     // Laatste OI-kolom moet de bronnotatie volgen (IWOD 2019 / DCIEM 1992: 15:00-18:00),
@@ -3487,6 +3544,54 @@
     push("privacy","Locatie wordt max 25 karakters", "25", String(cleanLocation("x".repeat(30)).length), cleanLocation("x".repeat(30)).length===25);
     push("privacy","Post/Ploeg wordt max 25 karakters", "25", String(cleanProjectText("p".repeat(30)).length), cleanProjectText("p".repeat(30)).length===25);
     push("privacy","DPL wordt max 8 karakters", "8", String(cleanDpl("d".repeat(30)).length), cleanDpl("d".repeat(30)).length===8);
+    // ===== v1.7.0: veiligheidsregio keuzelijst plus 40-tekengrens =====
+    const vrLiveDive = (vrWaarde, extra) => testState(Object.assign({
+      project:{date:today, location:"Oefenlocatie", post:"Post 1", dpl:"DPL1", veiligheidsregio:vrWaarde, activiteitType:"oefening", duiksysteem:"SCUBA"},
+      divers:[{id:"D1", code:"D1", label:"K01", active:true, defaultMdd:9, setNo:"", maskNo:""}],
+      live:[ensureAirFields({id:"vr_rt", diverId:"D1", entryMode:"achteraf", registrationType:"normal", dtMode:"auto", start:`${today}T09:00:00`, ascentStart:`${today}T09:17:30`, surface:`${today}T09:18:00`, mdd:9, daypart:"1", rule:"auto", notes:"vr-zelftest", airStartBar:300, airEndBar:240})]
+    }, extra||{}), ()=>{
+      const opgeslagen = state.project.veiligheidsregio;
+      const built = osodRecordsForRegistration();
+      const r = built.length ? built[0].record : null;
+      const exportVr = r ? r.context.veiligheidsregio : null;
+      const geldig = r ? osodValidateRecord(r).valid : false;
+      let importVr = null, importBewaard = null, importMode = null, importAdded = null;
+      if(r){
+        const json = JSON.stringify(built.map(b=>b.record));
+        state.live = [];
+        const imp = importOsodRecords(JSON.parse(json));
+        importAdded = imp.added;
+        ensureProjectMeta();
+        importBewaard = state.project.veiligheidsregio;
+        importMode = importBewaard==="" ? "leeg" : (isVeiligheidsregioCode(importBewaard) ? "code" : "anders");
+        const herbouwd = osodRecordsForRegistration();
+        importVr = herbouwd.length ? herbouwd[0].record.context.veiligheidsregio : null;
+      }
+      return {opgeslagen, exportVr, geldig, importVr, importBewaard, importMode, importAdded};
+    });
+    const vrCode = vrLiveDive("VR13");
+    push("privacy","Keuze uit de lijst zet de VR-code in context.veiligheidsregio", "VR13 geexporteerd", `${vrCode.exportVr}`, vrCode.exportVr==="VR13" && vrCode.geldig===true);
+    const vrAnders = vrLiveDive("Samenwerkingsverband Noord");
+    push("privacy","Anders met vrije tekst wordt opgeslagen en geexporteerd", "vrije tekst geexporteerd", `${vrAnders.exportVr}`, vrAnders.exportVr==="Samenwerkingsverband Noord" && vrAnders.geldig===true);
+    const vrRoundtrip = vrLiveDive("Veiligheidsregio Amsterdam-Amstelland");
+    push("privacy","Geimporteerde waarde buiten de 25 valt terug op anders en blijft behouden", "1 import, anders, behouden", `${vrRoundtrip.importAdded} import, ${vrRoundtrip.importMode}, ${vrRoundtrip.importBewaard==="Veiligheidsregio Amsterdam-Amstelland"?"behouden":"gewijzigd"}`, vrRoundtrip.importAdded===1 && vrRoundtrip.importMode==="anders" && vrRoundtrip.importBewaard==="Veiligheidsregio Amsterdam-Amstelland" && vrRoundtrip.importVr==="Veiligheidsregio Amsterdam-Amstelland");
+
+    const vrLoad = (vrWaarde) => testState({
+      project:{date:today, location:"Oefenlocatie", post:"Post 1", dpl:"DPL1", veiligheidsregio:vrWaarde, activiteitType:"oefening", duiksysteem:"SCUBA"},
+      divers:[{id:"D1", code:"D1", label:"K01", active:true, defaultMdd:9, setNo:"", maskNo:""}]
+    }, ()=>{
+      const v = state.project.veiligheidsregio;
+      const mode = v==="" ? "leeg" : (isVeiligheidsregioCode(v) ? "code" : "anders");
+      return {bewaard:v, mode};
+    });
+    const vrLeeg = vrLoad("");
+    const vrLeegRecord = vrLiveDive("");
+    push("privacy","Leeg laten blijft de OSOD-export blokkeren", "leeg blijft leeg, record ongeldig", `mode ${vrLeeg.mode}, ${vrLeegRecord.geldig?"geldig (fout)":"ongeldig"}`, vrLeeg.mode==="leeg" && vrLeeg.bewaard==="" && vrLeegRecord.geldig===false);
+    const vr34 = "Brandweer Samenwerkingsverband XYZ";
+    const vrLang = vrLoad(vr34);
+    push("privacy","Veiligheidsregio anders tussen 26 en 40 tekens blijft volledig behouden", `${vr34.length} tekens behouden`, `${vrLang.bewaard.length} tekens`, vrLang.bewaard===vr34 && vrLang.bewaard.length>25 && vrLang.bewaard.length<=40);
+    push("privacy","Veiligheidsregio-sanitatie kapt op 40 tekens", "40", String(cleanVeiligheidsregio("z".repeat(60)).length), cleanVeiligheidsregio("z".repeat(60)).length===40);
+    push("privacy","MAX_POST_CHARS blijft 25 voor Post/Ploeg", "25", String(MAX_POST_CHARS), MAX_POST_CHARS===25);
     const roundTrip = testState({project:{date:today,location:"Oefenlocatie",post:"Post 1",dpl:"DPL1"},divers:[{id:"D1",code:"D1",label:"K01",defaultMdd:9,setNo:"02",maskNo:"03"}],live:[ensureAirFields({id:"rt1",diverId:"D1",entryMode:"achteraf",registrationType:"normal",dtMode:"auto",start:`${today}T09:00:00`,surface:`${today}T09:12:19`,mdd:9,daypart:"1",rule:"auto",notes:"rondtrip",airStartBar:300,airEndBar:240,setNo:"02",maskNo:"03",airMeasurements:[{time:`${today}T09:05:00`,bar:270,depth:9}]})]},()=>{ const beforeRows=registrationRowsForExport().map(r=>r.join("|")).join("\n"); const json=JSON.stringify(state); importStateObject(JSON.parse(json)); const afterRows=registrationRowsForExport().map(r=>r.join("|")).join("\n"); return {rowsEqual:beforeRows===afterRows, setNo:state.live[0]?.setNo, maskNo:state.live[0]?.maskNo, mdd:state.live[0]?.mdd, bar:state.live[0]?.airStartBar}; });
     push("export","Synthetische JSON-rondtrip behoudt betekenisvolle registratie", "gelijk / 02 / 03 / 9 / 300", `${roundTrip.rowsEqual}/${roundTrip.setNo}/${roundTrip.maskNo}/${roundTrip.mdd}/${roundTrip.bar}`, roundTrip.rowsEqual && roundTrip.setNo==="02" && roundTrip.maskNo==="03" && roundTrip.mdd===9 && roundTrip.bar===300);
     push("privacy","CSV-export neutraliseert formules", "'=1+1", csvSafe("=1+1"), csvSafe("=1+1")==="'=1+1");
