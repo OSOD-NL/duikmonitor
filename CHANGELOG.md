@@ -2,6 +2,20 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.8.0] - 2026-06-20
+
+Op iPhone zoomt de app niet meer in bij het aanraken van een invoerveld en blijft het scherm na kantelen naar liggende stand niet langer uitvergroot.
+
+### Gewijzigd
+
+- De viewport-instelling krijgt maximum-scale=1, zodat Safari niet meer automatisch op invoervelden inzoomt en het beeld na het draaien van het toestel op de normale schaal blijft. Zoomen door de gebruiker met user-scalable wordt niet uitgezet; alleen de automatische focus-zoom verdwijnt.
+- Appversielabel verhoogd naar v1.8.0; de bijbehorende zelftest controleert mee op v1.8.0.
+- Het opstart-zelftal gaat van 369 naar 370 door een nieuwe zelftest die de viewport-instelling controleert.
+
+### Niet gewijzigd
+
+- Rekenkern, tabelwaarden, blokkeerlogica, statussemantiek, validatie en schema zijn niet aangeraakt. De bestaande invoerstabiliteit en alle stijlregels blijven ongemoeid. site.webmanifest, _headers en de iconen blijven byte-identiek.
+
 ## [1.7.0] - 2026-06-20
 
 Veiligheidsregio wordt een keuzelijst met de 25 officiele veiligheidsregio's en een werkende optie "anders" voor afwijkende waarden.

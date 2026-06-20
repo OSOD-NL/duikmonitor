@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'self'; object-src 'none'">
   <title>Duikmonitor</title>
 
@@ -569,7 +569,8 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.7.0";
+  const APP_VERSION = "v1.8.0";
+  const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
   const ISSUE_URL = "https://github.com/OSOD-NL/duikmonitor/issues/new/choose";
@@ -3418,7 +3419,21 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.7.0", APP_VERSION, APP_VERSION==="v1.7.0");
+    push("basis","Appversielabel", "v1.8.0", APP_VERSION, APP_VERSION==="v1.8.0");
+    // Viewport-meta moet maximum-scale=1 bevatten zodat iOS Safari niet op invoervelden
+    // inzoomt en na kantelen niet uitvergroot blijft. In de browser wordt de gerenderde
+    // meta-tag uit de <head> gelezen; in de Node-runner staat de <head> buiten het inline
+    // script, dus daar valt de toets terug op de verwachtingsconstante EXPECTED_VIEWPORT.
+    // De test faalt als maximum-scale ontbreekt of de inhoud afwijkt.
+    const expectedViewport = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
+    let actualViewport = EXPECTED_VIEWPORT;
+    try {
+      const vp = (typeof document !== "undefined" && document.querySelector)
+        ? document.querySelector('meta[name=viewport]') : null;
+      if(vp && typeof vp.content === "string" && vp.content) actualViewport = vp.content;
+    } catch(e){ /* DOM niet beschikbaar: val terug op EXPECTED_VIEWPORT */ }
+    push("basis","Viewport-meta bevat maximum-scale=1", expectedViewport, actualViewport,
+      actualViewport===expectedViewport && EXPECTED_VIEWPORT===expectedViewport && EXPECTED_VIEWPORT.includes("maximum-scale=1"));
     push("basis","Publieke website-url", "https://duikmonitor.nl/", PUBLIC_APP_URL, PUBLIC_APP_URL==="https://duikmonitor.nl/");
     push("basis","GitHub repository-url", "https://github.com/OSOD-NL/duikmonitor", REPO_URL, REPO_URL==="https://github.com/OSOD-NL/duikmonitor");
     // Laatste OI-kolom moet de bronnotatie volgen (IWOD 2019 / DCIEM 1992: 15:00-18:00),
