@@ -94,6 +94,7 @@ const context = {
   window: {},
   navigator: { userAgent: 'node-selftest' },
   __DUIKMONITOR_CSS__: (html.match(/<style>([\s\S]*?)<\/style>/i) || [,''])[1],
+  __DUIKMONITOR_VERSION_JSON__: (() => { try { return fs.readFileSync(path.join(root, 'version.json'), 'utf8'); } catch (e) { return ''; } })(),
   Blob: class Blob { constructor(parts, opts){ this.parts = parts; this.opts = opts; } },
   URL: { createObjectURL(){ return 'blob:mock'; }, revokeObjectURL(){} },
   setTimeout(fn){ return 0; },
