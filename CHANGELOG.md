@@ -2,6 +2,24 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.11.0] - 2026-06-21
+
+Een extra zelfcontrole op het versiebestand en een kort informatiekaartje over de standaard waarop de app rust.
+
+### Toegevoegd
+
+- Een zelftest die bij het opstarten controleert dat het versienummer in version.json exact gelijk is aan het versienummer van de app. Schuift version.json bij een nieuwe versie niet mee, dan valt het opstart-zelftal en wordt dat meteen zichtbaar in plaats van stil mis te gaan.
+- Een ingeklapt kaartje "Over de OSOD-standaard" op de Instellingen-pagina. Het legt kort uit dat OSOD de Open Standaard Operationele Duikregistratie is, dat deze app de referentie-implementatie ervan is en de rekenregels en het record-formaat van die standaard volgt, en dat de standaard zelf openbaar is. Een knop opent de standaard.
+
+### Gewijzigd
+
+- Appversielabel verhoogd naar v1.11.0; de bijbehorende zelftest controleert mee op v1.11.0. version.json bijgewerkt naar v1.11.0.
+- Het opstart-zelftal gaat van 374 naar 376 door de twee nieuwe zelftests: de controle op version.json en de controle op het OSOD-kaartje in de Instellingen-pagina.
+
+### Niet gewijzigd
+
+- Rekenkern, tabelwaarden, blokkeerlogica, statussemantiek, validatie en schema zijn niet aangeraakt. De versiemelding zelf is ongewijzigd; de nieuwe zelftest leest version.json en verandert die melding niet. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.10.0] - 2026-06-21
 
 De app merkt voortaan zelf op wanneer er een nieuwere versie klaarstaat en biedt aan om te vernieuwen, zonder ooit ongevraagd te herladen.

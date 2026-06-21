@@ -576,10 +576,11 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.10.0";
+  const APP_VERSION = "v1.11.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
+  const OSOD_REPO_URL = "https://github.com/OSOD-NL/OSOD";
   const ISSUE_URL = "https://github.com/OSOD-NL/duikmonitor/issues/new/choose";
   const SECURITY_URL = "https://github.com/OSOD-NL/duikmonitor/security";
   const STORAGE_KEY = "dciem_duikmonitor_v14";
@@ -3432,7 +3433,38 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.10.0", APP_VERSION, APP_VERSION==="v1.10.0");
+    push("basis","Appversielabel", "v1.11.0", APP_VERSION, APP_VERSION==="v1.11.0");
+    // version.json-zelftest (B-0030): controleert dat het veld "version" in het bestand
+    // version.json exact gelijk is aan APP_VERSION, zodat een niet-meegeschoven
+    // version.json het zelftal laat zakken en niet stil kan misgaan. De vergeleken waarde
+    // komt aantoonbaar uit het bestand version.json, niet uit een JS-constante: in de
+    // Node-runner draait de in-page code in een verzegelde vm-context zonder fs/fetch, dus
+    // scripts/run-selftests-node.js leest version.json van schijf en injecteert de ruwe
+    // inhoud als __DUIKMONITOR_VERSION_JSON__ (zelfde patroon als __DUIKMONITOR_CSS__).
+    // Hier lezen we die injectie via dezelfde typeof-grendel, parseren het veld "version"
+    // en vergelijken met APP_VERSION. In de browser is er geen injectie; daar borgt de
+    // runtime-fetch van version.json en slaat deze zelftest stil over (gemeld als OK),
+    // zodat hij in de browser geen valse rood geeft.
+    (function(){
+      if(typeof __DUIKMONITOR_VERSION_JSON__ !== "string" || !__DUIKMONITOR_VERSION_JSON__){
+        push("basis","version.json komt overeen met APP_VERSION (schijfwaarde, runner)",
+          "in browser overgeslagen (runtime-fetch borgt); in runner schijfvergelijking",
+          "geen injectie aanwezig: overgeslagen",
+          true);
+        return;
+      }
+      let bestandsVersie = null;
+      let parseFout = "";
+      try {
+        const obj = JSON.parse(__DUIKMONITOR_VERSION_JSON__);
+        bestandsVersie = (obj && typeof obj.version === "string") ? obj.version : null;
+      } catch(e){ parseFout = e && e.message ? e.message : String(e); }
+      const gelijk = bestandsVersie === APP_VERSION;
+      push("basis","version.json komt overeen met APP_VERSION (schijfwaarde, runner)",
+        APP_VERSION,
+        parseFout ? ("parsefout: " + parseFout) : String(bestandsVersie),
+        gelijk);
+    })();
     // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
     // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
     // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
@@ -3511,7 +3543,7 @@
       try{
         hideUpdateBar();
         // Nieuwere versie: melding verschijnt echt in de gerenderde balk.
-        const rNieuw = applyFetchedVersion("v1.10.1");
+        const rNieuw = applyFetchedVersion("v1.11.1");
         const nieuwerToont = rNieuw === "nieuwer" && zichtbaar(barEl);
         detail.push(`nieuwer[status=${rNieuw} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && nieuwerToont;
@@ -3521,20 +3553,20 @@
         detail.push(`gelijk[status=${rGelijk} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && gelijkVerbergt;
         // Oudere versie: geen melding.
-        applyFetchedVersion("v1.10.1");
+        applyFetchedVersion("v1.11.1");
         const rOud = applyFetchedVersion("v1.8.0");
         const ouderVerbergt = rOud === "nietNieuwer" && !zichtbaar(barEl);
         detail.push(`ouder[status=${rOud} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && ouderVerbergt;
         // Domme-string-grendel: een waarde buiten het versiepatroon toont niets, ook
         // niet na een staat waarin de melding zichtbaar was.
-        applyFetchedVersion("v1.10.1");
+        applyFetchedVersion("v1.11.1");
         const rGieftig = applyFetchedVersion("<img src=x onerror=alert(1)>");
         const grendelWerkt = rGieftig === "ongeldig" && !zichtbaar(barEl);
         detail.push(`grendel[status=${rGieftig} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && grendelWerkt;
         // Niet-versievormige numerieke onzin wordt ook geweigerd.
-        applyFetchedVersion("v1.10.1");
+        applyFetchedVersion("v1.11.1");
         const rOnzin = applyFetchedVersion("1.10.1");
         const onzinGeweigerd = rOnzin === "ongeldig" && !zichtbaar(barEl);
         detail.push(`zondervee[status=${rOnzin} zichtbaar=${zichtbaar(barEl)}]`);
@@ -3557,7 +3589,7 @@
         // hetzelfde zouden doen, zou onderstaande gelijk zijn. De test eist juist dat
         // een nieuwere versie WEL en een ongeldige NIET toont; deze controle faalt
         // zodra de meldingslogica wegvalt of beide takken samenvallen.
-        applyFetchedVersion("v1.10.1");
+        applyFetchedVersion("v1.11.1");
         const toontBijNieuw = zichtbaar(barEl);
         applyFetchedVersion("rommel");
         const toontBijRommel = zichtbaar(barEl);
@@ -3684,6 +3716,23 @@
     push("ui","Instellingen waarschuwt tegen persoonsgegevens in meldingen", "geen echte namen", settingsHtmlSource.includes("geen echte namen") ? "geen echte namen" : "ontbreekt", settingsHtmlSource.includes("geen echte namen"));
     push("ui","Instellingen bevat publieke GitHub-route", "duikmonitor.nl + GitHub", settingsHtmlSource.includes("Meedenken en melden") && settingsHtmlSource.includes("PUBLIC_APP_URL") && settingsHtmlSource.includes("ISSUE_URL") ? "duikmonitor.nl + GitHub" : "ontbreekt", settingsHtmlSource.includes("Meedenken en melden") && settingsHtmlSource.includes("PUBLIC_APP_URL") && settingsHtmlSource.includes("ISSUE_URL"));
     push("ui","Over deze tool staat standaard ingeklapt", "details zonder open", settingsHtmlSource.includes('<summary aria-label="Over deze tool openen of sluiten">Over deze tool</summary>') && !settingsHtmlSource.includes('<h3>Over deze tool</h3>') ? "details zonder open" : "afwijkend", settingsHtmlSource.includes('<summary aria-label="Over deze tool openen of sluiten">Over deze tool</summary>') && !settingsHtmlSource.includes('<h3>Over deze tool</h3>'));
+    // UI-interactietest (B-0024) voor het OSOD-standaardkaartje. Het kaartje is een
+    // ingeklapt details-element (openen/sluiten is interactie). We controleren de
+    // gerenderde Instellingen-bron (renderSettings.toString()) op: de summary "Over de
+    // OSOD-standaard", standaard ingeklapt (summary zonder een voorafgaand open-attribuut
+    // en geen <h3>-kop), een knop naar OSOD_REPO_URL, en gebruik van OSOD_VERSION in de
+    // tekstopbouw. Net als de "Over deze tool staat standaard ingeklapt"-test.
+    (function(){
+      const heeftSummary = settingsHtmlSource.includes('<summary aria-label="Over de OSOD-standaard openen of sluiten">Over de OSOD-standaard</summary>');
+      const ingeklapt = !settingsHtmlSource.includes('<h3>Over de OSOD-standaard</h3>') && settingsHtmlSource.includes('<details class="fold"><summary aria-label="Over de OSOD-standaard openen of sluiten">');
+      const heeftRepoUrl = settingsHtmlSource.includes("OSOD_REPO_URL");
+      const heeftVersie = settingsHtmlSource.includes("OSOD_VERSION");
+      const detail = `summary=${heeftSummary} ingeklapt=${ingeklapt} repoUrl=${heeftRepoUrl} versie=${heeftVersie}`;
+      push("ui","OSOD-standaardkaartje aanwezig, ingeklapt, met OSOD_REPO_URL-knop en OSOD_VERSION in tekst",
+        "summary aanwezig; details zonder open; OSOD_REPO_URL; OSOD_VERSION",
+        detail,
+        heeftSummary && ingeklapt && heeftRepoUrl && heeftVersie);
+    })();
     push("ui","Seinhouder-label is voluit in instellingen", "Seinhouder", settingsHtmlSource.includes("<th>Seinhouder</th>") && settingsHtmlSource.includes("Seinhouder is de seinhouder") ? "Seinhouder" : "ontbreekt", settingsHtmlSource.includes("<th>Seinhouder</th>") && settingsHtmlSource.includes("Seinhouder is de seinhouder"));
     push("basis","Standaard MDD na reset", "6 m", defaultState().divers[0].defaultMdd + " m", defaultState().divers.every(d=>d.defaultMdd===6));
     push("basis","D1 t/m D12 beschikbaar", "12 duikers", defaultState().divers.length + " duikers", defaultState().divers.length===12);
@@ -5175,7 +5224,7 @@
   function renderSettings(){
     document.getElementById("settingsScreen").innerHTML = `<div class="grid">
       <div class="card span12"><div class="headline"><h2>Instellingen</h2><details class="info no-print"><summary title="Uitleg Instellingen" aria-label="Uitleg Instellingen">i</summary><div class="info-body">Gebruik bij voorkeur vaste duikercodes en neutrale aanduidingen. Vrije aanduidingen, DPL en notities kunnen persoonsgegevens bevatten; deel die niet via GitHub of voorbeeldbestanden. Beheer en controle staan bovenaan; daaronder staan de standaard duikcodes en materiaalgegevens. Het schermthema (Nacht of Dag) staat rechtsboven in de balk. Nacht is donker voor bus en duisternis; Dag is licht met hoog contrast voor zon en waterkant. Bij openen kiest de app zelf op basis van de klok tussen nacht en dag; een eigen keuze blijft daarna staan. De knop Auto hieronder zet dat terug naar automatisch.</div></details></div><details class="fold no-print"><summary>Beheer en controle</summary><div class="fold-body"><div class="btnrow"><button class="bad" id="resetAll">Alles wissen</button><button class="primary" id="settingsSelftest">Zelftest openen</button></div><div class="soundbox compact"><div class="fieldrow"><div class="f4"><label>Drukcheck-geluid</label><select aria-label="Drukcheck-geluid" class="user" id="airSoundEnabled"><option value="off" ${state.settings?.airSoundEnabled?'':'selected'}>Uit</option><option value="on" ${state.settings?.airSoundEnabled?'selected':''}>Aan</option></select></div><div class="f4"><label>&nbsp;</label><button class="mini ghost" id="testAirSound">Test piep</button></div><div class="f4"><label>Schermthema</label><button class="mini ghost" id="themeAuto" title="Zet thema terug op automatisch (klok)">Auto (klok)</button></div></div></div></div></details></div>
-      <div class="card span12"><details class="fold"><summary aria-label="Over deze tool openen of sluiten">Over deze tool</summary><div class="fold-body"><p class="note">De Duikmonitor is een praktisch hulpmiddel voor aan de waterkant. Veel kun je vooraf regelen: plannen, opschrijven, oefenen. Tijdens een echte inzet gaat de registratie echter vaak nog met de hand. Deze app is bedoeld om te laten zien dat het ook eenvoudiger kan: een paar knoppen, en de duik staat geregistreerd, met de berekeningen en regels er al in.</p><p class="note">Het is een open voorbeeld, geen eindantwoord. De app is open source. Probeer hem uit, kijk of de berekeningen kloppen, en geef aan wat beter kan. Zie je iets, dan kijken we samen. Gebruik hem voor jezelf, pas hem aan voor je eigen regio, of bouw mee. Het gaat niet om deze app, maar om of het beter en veiliger kan.</p><div class="hint">De tabellen en regels horen voor operationeel gebruik door het juiste gezag bevestigd te worden.</div></div></details></div><div class="card span12 no-print"><div class="headline"><h3>Meedenken en melden</h3><details class="info no-print"><summary title="Uitleg Meedenken" aria-label="Uitleg Meedenken">i</summary><div class="info-body">Gebruik GitHub voor reproduceerbare fouten en concrete verbeterideeën. Zet daar geen echte namen, telefoonnummers, e-mailadressen, locaties of operationele persoonsgegevens in. Gebruik fictieve voorbeelden zoals Duiker 1.</div></details></div><p class="note">De publieke app staat op duikmonitor.nl. De broncode, documentatie en meldroute staan op GitHub.</p><div class="btnrow"><a class="buttonlink primary" href="${PUBLIC_APP_URL}" target="_blank" rel="noopener noreferrer">Website openen</a><a class="buttonlink ghost" href="${REPO_URL}" target="_blank" rel="noopener noreferrer">Broncode bekijken</a><a class="buttonlink ghost" href="${ISSUE_URL}" target="_blank" rel="noopener noreferrer">Probleem of idee melden</a><a class="buttonlink ghost" href="${SECURITY_URL}" target="_blank" rel="noopener noreferrer">Security-route</a></div><div class="hint">Meld beveiligingsproblemen niet openbaar in Issues. Deel exports alleen bewust; de app bewaart gegevens lokaal in deze browser.</div></div>
+      <div class="card span12"><details class="fold"><summary aria-label="Over deze tool openen of sluiten">Over deze tool</summary><div class="fold-body"><p class="note">De Duikmonitor is een praktisch hulpmiddel voor aan de waterkant. Veel kun je vooraf regelen: plannen, opschrijven, oefenen. Tijdens een echte inzet gaat de registratie echter vaak nog met de hand. Deze app is bedoeld om te laten zien dat het ook eenvoudiger kan: een paar knoppen, en de duik staat geregistreerd, met de berekeningen en regels er al in.</p><p class="note">Het is een open voorbeeld, geen eindantwoord. De app is open source. Probeer hem uit, kijk of de berekeningen kloppen, en geef aan wat beter kan. Zie je iets, dan kijken we samen. Gebruik hem voor jezelf, pas hem aan voor je eigen regio, of bouw mee. Het gaat niet om deze app, maar om of het beter en veiliger kan.</p><div class="hint">De tabellen en regels horen voor operationeel gebruik door het juiste gezag bevestigd te worden.</div></div></details></div><div class="card span12"><details class="fold"><summary aria-label="Over de OSOD-standaard openen of sluiten">Over de OSOD-standaard</summary><div class="fold-body"><p class="note">OSOD is de Open Standaard Operationele Duikregistratie (versie ${OSOD_VERSION}). Deze app is de referentie-implementatie ervan en volgt de rekenregels en het record-formaat van die standaard. De app conformeert zich aan de standaard, niet andersom.</p><p class="note">De standaard zelf is openbaar. Je kunt hem inzien en meelezen via de OSOD-repository.</p><div class="btnrow"><a class="buttonlink ghost" href="${OSOD_REPO_URL}" target="_blank" rel="noopener noreferrer">OSOD-standaard openen</a></div></div></details></div><div class="card span12 no-print"><div class="headline"><h3>Meedenken en melden</h3><details class="info no-print"><summary title="Uitleg Meedenken" aria-label="Uitleg Meedenken">i</summary><div class="info-body">Gebruik GitHub voor reproduceerbare fouten en concrete verbeterideeën. Zet daar geen echte namen, telefoonnummers, e-mailadressen, locaties of operationele persoonsgegevens in. Gebruik fictieve voorbeelden zoals Duiker 1.</div></details></div><p class="note">De publieke app staat op duikmonitor.nl. De broncode, documentatie en meldroute staan op GitHub.</p><div class="btnrow"><a class="buttonlink primary" href="${PUBLIC_APP_URL}" target="_blank" rel="noopener noreferrer">Website openen</a><a class="buttonlink ghost" href="${REPO_URL}" target="_blank" rel="noopener noreferrer">Broncode bekijken</a><a class="buttonlink ghost" href="${ISSUE_URL}" target="_blank" rel="noopener noreferrer">Probleem of idee melden</a><a class="buttonlink ghost" href="${SECURITY_URL}" target="_blank" rel="noopener noreferrer">Security-route</a></div><div class="hint">Meld beveiligingsproblemen niet openbaar in Issues. Deel exports alleen bewust; de app bewaart gegevens lokaal in deze browser.</div></div>
       <div class="card span12"><div class="headline"><h3>Duikers</h3><details class="info no-print"><summary title="Uitleg Duikers" aria-label="Uitleg Duikers">i</summary><div class="info-body">Na Alles wissen staat de monitor weer schoon met vaste duikers D1 t/m D12 en MDD 6 m. Vink Actief uit om een duikerslot tijdelijk uit planning, live bediening en overzichten te halen. Duiker is de vaste code; Aanduiding is vrij en optioneel. Seinhouder is de seinhouder voor deze duiker; de duikploegleider staat bij de daggegevens. Set # en Masker # worden bij Start duik gekopieerd naar de duikregistratie.</div></details></div><div class="btnrow no-print"><button class="ghost" id="depthAllToggle" title="Zet de standaard-MDD van alle duikers in één keer">Diepte voor allen…</button><span id="depthAllPanel" style="display:none;align-items:center;gap:6px"><input aria-label="Standaard-MDD voor alle duikers" class="user" type="number" inputmode="numeric" step="1" min="0" max="15" id="depthAllValue" placeholder="m" style="max-width:80px"><button class="primary mini" id="depthAllApply">Toepassen</button></span></div><div class="tablewrap"><table class="table"><thead><tr><th>Actief</th><th>Duiker</th><th>Aanduiding</th><th>Seinhouder</th><th>MDD</th><th>Set #</th><th>Masker #</th></tr></thead><tbody>${state.divers.map(d=>`<tr><td><input type="checkbox" data-diver-active="${esc(d.id)}" ${isDiverActive(d)?'checked':''} aria-label="${esc(diverCode(d))} actief"></td><td class="mono"><strong>${esc(diverCode(d))}</strong></td><td><input aria-label="Aanduiding ${esc(diverCode(d))}" class="user" data-diver-label="${esc(d.id)}" maxlength="8" value="${esc(cleanDiverLabel(d.label))}" placeholder="bijv. K01, INS1"></td><td><input aria-label="Seinhouder ${esc(diverCode(d))}" class="user" maxlength="8" data-diver-sh="${esc(d.id)}" value="${esc(d.sh||'')}" placeholder="-"></td><td><input aria-label="MDD ${esc(diverCode(d))}" class="user" type="text" inputmode="decimal" data-diver-mdd="${esc(d.id)}" value="${esc(d.defaultMdd||6)}"></td><td><input aria-label="Set ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-set="${esc(d.id)}" value="${esc(d.setNo||'')}" placeholder="-"></td><td><input aria-label="Masker ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-mask="${esc(d.id)}" value="${esc(d.maskNo||'')}" placeholder="-"></td></tr>`).join("")}</tbody></table></div><p class="small muted">D1 t/m D12 zijn vaste duikercodes en worden niet automatisch hernummerd. Gebruik Aanduiding alleen voor een rol of neutrale herkenning. Gebruik geen echte namen als je exports of voorbeelden deelt.</p></div>
       <div class="card span12"><details class="fold" data-expand-all-details="true"><summary>Rekenregels</summary><div class="fold-body"><div class="warnbox"><b>Hulpmiddel.</b> Deze app ondersteunt planning, controle en registratie. De app vervangt geen formele werkinstructie, papieren tabel, duikcomputer, duikploegleider, LMRA, werkplan, medisch advies of regionaal beleid.</div><div class="hint"><b>Bron DCIEM-tabellen:</b> IWOD 002 Decompressiemethoden (1 april 2019) § 2300 luchttabel 1.</div><div class="hint" style="margin-top:8px"><b>HF voor groep B bij OI 2:00-2:59:</b> de monitor gebruikt 1,2. Dat is de waarde van de canonieke DCIEM-bron, bevestigd door de IWOD 002 (2019) en het DCIEM-origineel (1992). De Landelijke Werkinstructie WOD v2.0 vermeldt op deze ene cel 1,1. Dit is een gedocumenteerd bronconflict; de monitor volgt de bronwaarde 1,2. Terzijde: 1,2 is ook de strengere van de twee, want een hogere HF geeft een langere EDT, dus de monitor staat hiermee aan de veilige kant.</div><div class="fieldrow" style="margin-top:12px"><div class="f6"><h3>Controle en verificatie</h3><p class="note">De berekeningen zijn controleerbaar via de broncode in de repository, vaste testgevallen en de ingebouwde zelftest. Gebruik de zelftest om de rekenregels op dit toestel opnieuw te controleren.</p><div class="hint">Bij een release horen appversie, bronprofiel en controlegetal, zodat later duidelijk is welke versie is gebruikt.</div></div><div class="f6"><h3>Kernregels ingebouwd</h3><ul class="messages"><li>No-deco tot maximaal 15 m.</li><li>MDD wordt afgerond naar tabeldiepte 6/9/12/15 m.</li><li>Airtabel 1 bepaalt HG.</li><li>Tabel 4a bepaalt HF op basis van HG en OI.</li><li>Tabel 4b bepaalt herhalings-NDL.</li><li>EDT = DT × HF, conservatief afgerond naar boven.</li><li>6-, 9- en 12-meterregel wordt alleen als toegepast getoond wanneer duikmomenten van dezelfde duiker worden opgeteld.</li><li>Dagdeel 1 en Dagdeel 2 worden gescheiden berekend.</li></ul></div><div class="f6"><h3>Dagdeel en meterregel</h3><p class="note">Bij een losse duik toont de monitor Tabel 1 met de juiste tabeldiepte. Pas wanneer duikmomenten van dezelfde duiker binnen hetzelfde dagdeel worden samengenomen, toont de monitor 6-, 9- of 12-meterregel toegepast; daarbij gebruikt de monitor de hoogste MDD en telt hij de duiktijden op voor één HG.</p><div class="hint">Eén losse duik t/m 6/9/12 m = Tabel 1 met tabeldiepte 6/9/12 m. Meerdere duikmomenten van dezelfde duiker die worden opgeteld = 6-/9-/12-meterregel toegepast. Duiken van verschillende duikers worden nooit samengevoegd.</div><div class="hint" style="margin-top:8px"><b>Periodebewaking:</b> als duikmomenten over twee dagdelen vallen zonder rustpauze van minimaal 1 uur ertussen, telt de monitor de duiktijden alsnog op tijdsbasis op en waarschuwt bij overschrijding van de meterregellimiet. Controleer dan of het operationeel echt om twee dagdelen gaat.</div></div><div class="f6"><h3>Dieper dan 12 m</h3><p class="note">De monitor geeft nu een aparte procedurehint bij geplande en niet-geplande situaties boven 12 m.</p><div class="hint">${esc(over12PlannedGuidance)}</div><div class="warnbox" style="margin-top:10px"><b>Niet-geplande overschrijding, alleen als ook de 3-duikenlimiet is overschreden:</b> ${esc(over12UnplannedProcedure)}</div></div><div class="f12"><h3>Opstijgingen en rust</h3><p class="note">Opstijgingen worden per duiker bewaakt per duikperiode van 4 uur en per duikdag. Tussen twee opstijgingen geldt minimaal 15 minuten oppervlakte-interval. Na een duikperiode van 4 uur geldt minimaal 1 uur rust.</p><div class="tablewrap"><table class="table"><thead><tr><th>Maximale diepte</th><th>Per 4 uur</th><th>Per dag</th><th>Bronlaag</th></tr></thead><tbody><tr><td>t/m 6 m</td><td>6</td><td>12</td><td>DMC-advies 2013</td></tr><tr><td>&gt;6 t/m 9 m</td><td>4</td><td>8</td><td>DMC-advies 2013</td></tr><tr><td>&gt;9 t/m 12 m</td><td>3</td><td>6</td><td>Conservatieve projectregel</td></tr><tr><td>&gt;12 t/m 15 m</td><td>3</td><td>3</td><td>WOD-regime / projectmatige borging</td></tr></tbody></table></div><div class="hint" style="margin-top:10px"><b>Waarom extra?</b> De meterregel vereenvoudigt DCIEM-planning voor meerdere ondiepe duikmomenten. Die vereenvoudiging is geen toestemming voor onbeperkt herhaald opstijgen; daarom bewaakt de monitor ook de opstijgingsaantallen.</div><p class="small muted">DMC noemt 6 m en 9 m expliciet. De diepere categorieën zijn conservatief/projectmatig geborgd; de meest beperkende grens is leidend.</p></div><div class="f6"><h3>Opkomstvenster</h3><p class="note">Gebaseerd op 18 ± 3 meter per minuut. Live-metingen worden op seconden gecontroleerd.</p><div class="hint">Te snel, niet geregistreerd of afwijkend opkomen geeft een controlehint in de hoofdstatus.</div></div><div class="f6"><h3>Ademluchtbewaking</h3><p class="note">Actieve duiken kunnen tussentijds luchtmetingen vastleggen. De monitor gebruikt standaard 2×4 L, rekent resterende tijd tot 100 bar en kiest automatisch het juiste drukcheck-interval.</p><div class="hint">Ademluchtbewaking is een operationele controlelaag, geen DCIEM-tabelbron.</div></div><div class="f12"><h3>Privacy en lokaal gebruik</h3><p class="note">De monitor rekent in de browser op dit apparaat. Ingevoerde gegevens worden niet automatisch naar een server verzonden.</p><p class="note">Er is geen account, geen centrale database en geen automatische synchronisatie. Gegevens blijven lokaal in de browser, tenzij de gebruiker ze zelf exporteert, print, kopieert of deelt.</p><div class="hint">De appbestanden kunnen via duikmonitor.nl of als lokaal bestand worden geopend. Ingevulde duikgegevens en berekeningen worden door de app niet naar GitHub, de beheerder of een eigen server verzonden. Bij het openen van een openbare website kan de hostinglaag wel normale technische requestgegevens ontvangen; dat staat los van de lokale appdata.</div></div></div></div></details></div>
       <div class="card span12"><details class="fold"><summary>Voorbeelden laden</summary><div class="fold-body"><div class="headline"><h3>Voorbeeld laden</h3><details class="info no-print"><summary title="Uitleg Voorbeelden" aria-label="Uitleg Voorbeelden">i</summary><div class="info-body">Voorbeelden zijn fictieve demo-gegevens met alleen codes. Ze zijn bedoeld om de app, meldingen, registratie en export te bekijken. Laden vervangt de huidige gegevens. De zelftest is iets anders: die controleert automatisch de rekenregels met vaste verwachte uitkomsten en schrijft niets weg in je echte planning of dagregistratie.</div></details></div><div class="fieldrow">
