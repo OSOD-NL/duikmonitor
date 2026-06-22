@@ -2,6 +2,24 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.12.0] - 2026-06-22
+
+De versiemelding "Nieuwe versie beschikbaar" staat niet langer als zwevende balk over de inhoud, maar als vaste strook in de pagina.
+
+### Toegevoegd
+
+- Een zelftest die borgt dat de versiemelding in de pagina-flow boven de installatiestrook staat en niet zwevend is.
+
+### Gewijzigd
+
+- De versiemelding "Nieuwe versie beschikbaar" is van een zwevende balk onderin omgezet naar een vaste strook in de pagina, in dezelfde stijl als de strook "Zet Duikmonitor op je beginscherm" en daarboven geplaatst. De melding valt daardoor niet meer over de onderste regels van een volle duikerlijst.
+- Appversielabel verhoogd naar v1.12.0; de bijbehorende zelftest controleert mee op v1.12.0. version.json bijgewerkt naar v1.12.0.
+- Het opstart-zelftal gaat van 376 naar 377 door de nieuwe zelftest op de plaatsing van de versiemelding.
+
+### Niet gewijzigd
+
+- Het gedrag van de updatecontrole blijft gelijk: de melding verschijnt alleen bij een nieuwere versie, verdwijnt vanzelf en herlaadt pas na een tik. De installatiestrook zelf verandert niet. Rekenkern, tabelwaarden, blokkeerlogica, statussemantiek, validatie en schema zijn niet aangeraakt. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.11.0] - 2026-06-21
 
 Een extra zelfcontrole op het versiebestand en een kort informatiekaartje over de standaard waarop de app rust.
