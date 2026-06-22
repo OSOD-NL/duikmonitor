@@ -437,8 +437,8 @@
     details.installbar .installbar-body h3{margin:8px 0 2px;font-size:13px;color:var(--installbar-text)}
     details.installbar .installbar-body p{margin:2px 0;font-size:12px;color:var(--installbar-text)}
     body.is-standalone details.installbar{display:none}
-    #updateBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom, 0px) + 76px);z-index:60;max-width:calc(100% - 24px);display:none;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--updatebar-border);border-radius:999px;background:var(--updatebar-bg);color:var(--updatebar-text);font-weight:800;font-size:13px;cursor:pointer;text-align:left}
-    #updateBar.show{display:inline-flex}
+    #updateBar{margin:10px 12px 0;display:none;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--updatebar-border);border-radius:14px;background:var(--updatebar-bg);color:var(--updatebar-text);font-weight:800;font-size:13px;cursor:pointer;text-align:left;width:auto}
+    #updateBar.show{display:flex}
     #updateBar::before{content:"↻";display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;border:1px solid currentColor;font-weight:950;line-height:1;flex:0 0 auto}
     @media print{#updateBar{display:none!important}}
     input.user.need-hint,select.user.need-hint,textarea.user.need-hint{border-color:var(--required-border);background:var(--required-bg);color:var(--required-text)}
@@ -558,6 +558,7 @@
   <nav class="tabs" id="tabs"></nav>
 </header>
 <div class="bottomnav no-print" id="bottomnav"></div>
+<button type="button" id="updateBar" class="no-print" aria-live="polite" hidden>Nieuwe versie beschikbaar, tik om te vernieuwen</button>
 <details class="installbar no-print"><summary>Zet Duikmonitor op je beginscherm</summary><div class="installbar-body"><h3>iPhone en iPad</h3><p>Open Duikmonitor in Safari. Tik op Delen. Kies Zet op beginscherm. Tik op Voeg toe.</p><h3>Android</h3><p>Open Duikmonitor in Chrome, Edge of Samsung Internet. Tik op het menu. Kies App installeren of Toevoegen aan startscherm.</p></div></details>
 <main>
   <section id="planScreen" class="screen"></section>
@@ -571,12 +572,11 @@
 </main>
 <input aria-label="Importbestand (JSON) kiezen" id="importFile" type="file" accept="application/json" class="hide" />
 <input aria-label="OSOD-importbestand (JSON) kiezen" id="osodImportFile" type="file" accept="application/json" class="hide" />
-<button type="button" id="updateBar" class="no-print" aria-live="polite" hidden>Nieuwe versie beschikbaar, tik om te vernieuwen</button>
 <script>
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.11.0";
+  const APP_VERSION = "v1.12.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -3433,7 +3433,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.11.0", APP_VERSION, APP_VERSION==="v1.11.0");
+    push("basis","Appversielabel", "v1.12.0", APP_VERSION, APP_VERSION==="v1.12.0");
     // version.json-zelftest (B-0030): controleert dat het veld "version" in het bestand
     // version.json exact gelijk is aan APP_VERSION, zodat een niet-meegeschoven
     // version.json het zelftal laat zakken en niet stil kan misgaan. De vergeleken waarde
@@ -3543,7 +3543,7 @@
       try{
         hideUpdateBar();
         // Nieuwere versie: melding verschijnt echt in de gerenderde balk.
-        const rNieuw = applyFetchedVersion("v1.11.1");
+        const rNieuw = applyFetchedVersion("v1.12.1");
         const nieuwerToont = rNieuw === "nieuwer" && zichtbaar(barEl);
         detail.push(`nieuwer[status=${rNieuw} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && nieuwerToont;
@@ -3553,20 +3553,20 @@
         detail.push(`gelijk[status=${rGelijk} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && gelijkVerbergt;
         // Oudere versie: geen melding.
-        applyFetchedVersion("v1.11.1");
+        applyFetchedVersion("v1.12.1");
         const rOud = applyFetchedVersion("v1.8.0");
         const ouderVerbergt = rOud === "nietNieuwer" && !zichtbaar(barEl);
         detail.push(`ouder[status=${rOud} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && ouderVerbergt;
         // Domme-string-grendel: een waarde buiten het versiepatroon toont niets, ook
         // niet na een staat waarin de melding zichtbaar was.
-        applyFetchedVersion("v1.11.1");
+        applyFetchedVersion("v1.12.1");
         const rGieftig = applyFetchedVersion("<img src=x onerror=alert(1)>");
         const grendelWerkt = rGieftig === "ongeldig" && !zichtbaar(barEl);
         detail.push(`grendel[status=${rGieftig} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && grendelWerkt;
         // Niet-versievormige numerieke onzin wordt ook geweigerd.
-        applyFetchedVersion("v1.11.1");
+        applyFetchedVersion("v1.12.1");
         const rOnzin = applyFetchedVersion("1.10.1");
         const onzinGeweigerd = rOnzin === "ongeldig" && !zichtbaar(barEl);
         detail.push(`zondervee[status=${rOnzin} zichtbaar=${zichtbaar(barEl)}]`);
@@ -3589,7 +3589,7 @@
         // hetzelfde zouden doen, zou onderstaande gelijk zijn. De test eist juist dat
         // een nieuwere versie WEL en een ongeldige NIET toont; deze controle faalt
         // zodra de meldingslogica wegvalt of beide takken samenvallen.
-        applyFetchedVersion("v1.11.1");
+        applyFetchedVersion("v1.12.1");
         const toontBijNieuw = zichtbaar(barEl);
         applyFetchedVersion("rommel");
         const toontBijRommel = zichtbaar(barEl);
@@ -3607,8 +3607,85 @@
         detail.join(" "),
         alleOk);
     })();
-    // Versievergelijking is numeriek per onderdeel, niet als tekst. Borgt dat v1.10.0
-    // nieuwer is dan v1.9.0 (waar tekstvergelijking "1.9" > "1.10" fout zou geven).
+    // UI-interactietest (B-0024-geest): de updatemelding #updateBar staat als in-flow
+    // strook (installbar-stijl) BOVEN de installatiestrook, niet als zwevende pil. We
+    // toetsen niet op getComputedStyle of compareDocumentPosition (de Node-mock heeft
+    // die niet); we toetsen op de bron die in beide contexten beschikbaar is: de
+    // CSS-tekst (browser: <style>; Node: __DUIKMONITOR_CSS__) en de HTML-brontekst
+    // (browser: document.documentElement.outerHTML; Node: __DUIKMONITOR_HTML__).
+    (function(){
+      // CSS-brontekst, zelfde haak als getThemeTokenCSS.
+      function updateBarPlacementCss(){
+        let css = "";
+        try{ if(typeof __DUIKMONITOR_CSS__ === "string" && __DUIKMONITOR_CSS__) css = __DUIKMONITOR_CSS__; }catch(e){}
+        if(!css){ try{ const el = document.querySelector("style"); if(el && el.textContent) css = el.textContent; }catch(e){} }
+        return css;
+      }
+      // HTML-brontekst voor de bronvolgorde. In de browser de geserialiseerde DOM, in
+      // de Node-runner de geinjecteerde paginabron __DUIKMONITOR_HTML__. Beide leveren
+      // een string waarop met indexOf de volgorde bepaald wordt; geen
+      // compareDocumentPosition.
+      function pageSource(){
+        let src = "";
+        try{ if(typeof __DUIKMONITOR_HTML__ === "string" && __DUIKMONITOR_HTML__) src = __DUIKMONITOR_HTML__; }catch(e){}
+        if(!src){ try{ if(typeof document !== "undefined" && document.documentElement && typeof document.documentElement.outerHTML === "string") src = document.documentElement.outerHTML; }catch(e){} }
+        return src;
+      }
+      // Snijd de basisregel #updateBar{...} uit de CSS (de eerste, niet de print-regel),
+      // zodat de assertie alleen die regel beoordeelt.
+      function updateBarRule(css){
+        const i = css.indexOf("#updateBar{");
+        if(i < 0) return "";
+        const open = i + "#updateBar".length;
+        const close = css.indexOf("}", open);
+        if(close < 0) return "";
+        return css.slice(i, close + 1);
+      }
+      const detail = [];
+      let alleOk = true;
+      try{
+        const css = updateBarPlacementCss();
+        const rule = updateBarRule(css);
+        const ruleGevonden = rule.length > 0;
+        // In-flow: geen position:fixed in de basisregel.
+        const geenFixed = ruleGevonden && rule.indexOf("position:fixed") < 0;
+        // In-flow-kenmerk: installbar-marge-orde (margin:10px 12px 0) aanwezig.
+        const heeftFlowMarge = rule.indexOf("margin:10px 12px 0") >= 0;
+        // Radius is niet de pil-radius 999px.
+        const geenPilRadius = ruleGevonden && rule.indexOf("border-radius:999px") < 0;
+        // Radius is van installbar-orde (14px).
+        const heeftBalkRadius = rule.indexOf("border-radius:14px") >= 0;
+        detail.push(`css[regel=${ruleGevonden} geenFixed=${geenFixed} flowMarge=${heeftFlowMarge} geenPil=${geenPilRadius} balkRadius=${heeftBalkRadius}]`);
+        alleOk = alleOk && geenFixed && heeftFlowMarge && geenPilRadius && heeftBalkRadius;
+        // Bronvolgorde: #updateBar staat vóór de installatiestrook (details.installbar).
+        const src = pageSource();
+        const idxUpdate = src.indexOf('id="updateBar"');
+        const idxInstall = src.indexOf('class="installbar');
+        const bronBeschikbaar = idxUpdate >= 0 && idxInstall >= 0;
+        const updateBoven = bronBeschikbaar && idxUpdate < idxInstall;
+        detail.push(`volgorde[bron=${bronBeschikbaar} update=${idxUpdate} install=${idxInstall} updateBoven=${updateBoven}]`);
+        alleOk = alleOk && bronBeschikbaar && updateBoven;
+        // Negatieve grendel (anti-tautologie): dezelfde asserties op vervalste invoer
+        // MOETEN falen. Een teruggezette zwevende pil (position:fixed, radius 999px) en
+        // een omgedraaide volgorde worden hier expliciet afgekeurd; als de bovenstaande
+        // controles deze gevallen zouden doorlaten, valt de grendel en faalt de test.
+        const valsRule = "#updateBar{position:fixed;border-radius:999px}";
+        const valsGeenFixed = valsRule.indexOf("position:fixed") < 0;
+        const valsGeenPil = valsRule.indexOf("border-radius:999px") < 0;
+        const valsSrc = '<details class="installbar"></details><button id="updateBar"></button>';
+        const valsUpdateBoven = valsSrc.indexOf('id="updateBar"') < valsSrc.indexOf('class="installbar');
+        const grendelValt = valsGeenFixed === false && valsGeenPil === false && valsUpdateBoven === false;
+        detail.push(`grendel[valsFixed=${valsGeenFixed} valsPil=${valsGeenPil} valsVolgorde=${valsUpdateBoven} valt=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){
+        alleOk = false;
+        detail.push("uitzondering: " + (e && e.message ? e.message : String(e)));
+      }
+      push("ui","Updatestrook staat in-flow (geen position:fixed, installbar-radius) boven de installatiestrook",
+        "geenFixed en flow-radius; bronvolgorde update vóór install; negatieve grendel valt",
+        detail.join(" "),
+        alleOk);
+    })();
     push("basis","Updatecheck: versievergelijking is numeriek per onderdeel",
       "v1.10.0>v1.9.0 en v1.9.0<v1.10.0",
       `${compareAppVersions("v1.10.0","v1.9.0")>0}/${compareAppVersions("v1.9.0","v1.10.0")<0}/${compareAppVersions("v1.10.0","v1.10.0")===0}`,
