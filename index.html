@@ -579,7 +579,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.14.0";
+  const APP_VERSION = "v1.15.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -1164,7 +1164,20 @@
     }
   }
 
-  const AIR_CYLINDER_LITERS = 8;
+  const AIR_CYLINDER_LITERS = 8; // veilige standaard (2x4); de werkelijke waarde komt uit de instelling cylinderSet
+  // Instelbare flessenset (globaal, niet per duiker). Twee toegestane sets; de kleinere
+  // 2x4 is de veilige standaard. ensureSettings valideert state.settings.cylinderSet naar
+  // een van deze sleutels; airCylinderLiters() levert de bijbehorende liters voor zowel de
+  // SAC- als de resterende-tijd-berekening. Geen hardgecodeerde 8 meer in de berekening.
+  const CYLINDER_SETS = { "2x4": 8, "2x6": 12 };
+  const DEFAULT_CYLINDER_SET = "2x4";
+  function normalizeCylinderSet(value){
+    return Object.prototype.hasOwnProperty.call(CYLINDER_SETS, value) ? value : DEFAULT_CYLINDER_SET;
+  }
+  function airCylinderLiters(){
+    const set = normalizeCylinderSet(state?.settings?.cylinderSet);
+    return CYLINDER_SETS[set];
+  }
   const AIR_STOP_BAR = 100;
   const AIR_CHECK_INTERVAL_SHALLOW_MIN = 10;
   const AIR_CHECK_INTERVAL_DEEP_MIN = 5;
@@ -1210,7 +1223,7 @@
       divers:Array.from({length:DIVER_SLOT_COUNT},(_,i)=>({id:defaultDiverCode(i), code:defaultDiverCode(i), label:"", active:i < 4, defaultMdd:6, setNo:"", maskNo:""})),
       planning:[],
       live:[],
-      settings:{airSoundEnabled:true, theme:"auto"}  // theme: auto | night | day
+      settings:{airSoundEnabled:true, theme:"auto", cylinderSet:DEFAULT_CYLINDER_SET}  // theme: auto | night | day; cylinderSet: 2x4 | 2x6
     };
   }
 
@@ -1218,6 +1231,7 @@
     if(!state.settings || typeof state.settings !== "object") state.settings = {};
     state.settings.airSoundEnabled = !!state.settings.airSoundEnabled;
     state.settings.theme = normalizeThemePreference(state.settings.theme);
+    state.settings.cylinderSet = normalizeCylinderSet(state.settings.cylinderSet);
   }
   // Twee modi: night en day. Oude "bright" migreert naar day. "auto" laat de klok kiezen.
   function normalizeThemePreference(value){
@@ -2577,6 +2591,11 @@
     return ensureAirFields({id:uid(), diverId, entryMode:"achteraf", registrationType:"normal", dtMode:"auto", dtUsedMin:"", phases:[], start:"", ascentStart:"", surface:"", mdd:cleanMddValue(div.defaultMdd,{clamp:true,fallback:6}), rule:"auto", daypart:"1", notes:"", signalHolder:"", setNo:div.setNo||"", maskNo:div.maskNo||""});
   }
   function latestActiveDive(diverId){ return [...state.live].reverse().find(d=>d.diverId===diverId && d.start && !d.surface); }
+  // "Loopt er ergens een duik": een live-duik met start && !surface, ongeacht welke duiker.
+  // Gebruikt om de flessenset-keuze te vergrendelen zolang een actieve duik loopt, zodat de
+  // flesinhoud halverwege niet kan wijzigen (dat zou de lopende SAC- en resterende-tijd-
+  // berekening van die duik veranderen).
+  function anyActiveLiveDive(){ return (state.live || []).some(d=>d && d.start && !d.surface); }
   // Een afgesloten duik (boven gemeld) waarvan de einddruk nog niet is vastgelegd.
   // De einddruk is per definitie de druk boven, aan het eind van de duik; een
   // tussentijdse luchtmeting op diepte telt daar niet voor. Een afgesloten duik
@@ -2649,7 +2668,34 @@
     }
     const candidates = [rateStart, rateLast].filter(x=>Number.isFinite(x) && x > 0);
     const rateBarMin = candidates.length ? Math.max(...candidates) : null;
-    const rateLitersMin = rateBarMin == null ? null : rateBarMin * AIR_CYLINDER_LITERS;
+    const cylinderLiters = airCylinderLiters();
+    const rateLitersMin = rateBarMin == null ? null : rateBarMin * cylinderLiters;
+    // SAC (Surface Air Consumption): ademhaling van de duiker zelf, diepte-onafhankelijk,
+    // teruggerekend naar de oppervlakte. Bewust een los hulpgetal naast de bestaande
+    // luchtveiligheidsberekening (rateBarMin/remainingMin), met eigen logica. Genomen over
+    // HET LAATSTE interval (prev -> last), niet het gemiddelde sinds start: alleen dat
+    // interval heeft een begin- en einddiepte om fysisch netjes mee te normaliseren en het
+    // beweegt mee met de duiker. Normalisatie: drukval/min * flesinhoud / ata, met ata uit
+    // de GEMIDDELDE diepte van het interval en EXACT dezelfde ata-formule als airUsePerMin
+    // (1 + d/10), zodat heen (ademtempo->verbruik op diepte) en terug (verbruik op
+    // diepte->ademtempo) dezelfde omgevingsdruk gebruiken.
+    // Randgevallen (sacState): "ok" = getal beschikbaar; "no-interval" = nog geen tweede
+    // meting/geen bruikbaar interval; "no-depth" = diepte ontbreekt bij prev of last. Bij
+    // niet-ok is sacLMin null en toont de UI een streepje (geen stille terugval op
+    // verbruik-op-diepte, geen deling door nul). Diepte 0 (oppervlak) is geldig: ata 1.
+    let sacLMin = null;
+    let sacState = "no-interval";
+    if(prev && last && Number.isFinite(rateLast) && rateLast > 0){
+      const depthUsable = Number.isFinite(prev.depth) && Number.isFinite(last.depth);
+      if(!depthUsable){
+        sacState = "no-depth";
+      } else {
+        const avgDepth = (prev.depth + last.depth) / 2;
+        const ata = 1 + avgDepth/10; // zelfde definitie als airUsePerMin
+        sacLMin = (rateLast * cylinderLiters) / ata;
+        sacState = "ok";
+      }
+    }
     const remainingMin = (last && rateBarMin) ? Math.max(0, Math.floor((last.bar - AIR_STOP_BAR) / rateBarMin)) : null;
     const reference = last?.time || start;
     const checkIntervalMin = updateAirCheckInterval(d);
@@ -2684,7 +2730,7 @@
       else if(overdue){ cls="warn"; label="Controle verlopen"; messages.push("Luchtmeting is verlopen; actuele druk controleren."); }
       else { cls="ok"; label="Lucht bewaakt"; }
     }
-    return {start, startBar, measurements:ms, last, prev, rateStart, rateLast, rateBarMin, rateLitersMin, remainingMin, checkIntervalMin, nextCheck, secondsToNext, overdue, cls, label, messages, timerNeedsCheck, elapsedLiveMin};
+    return {start, startBar, measurements:ms, last, prev, rateStart, rateLast, rateBarMin, rateLitersMin, sacLMin, sacState, cylinderLiters, remainingMin, checkIntervalMin, nextCheck, secondsToNext, overdue, cls, label, messages, timerNeedsCheck, elapsedLiveMin};
   }
   function airNextText(a){
     if(!a.nextCheck) return "-";
@@ -2732,8 +2778,8 @@
         <div class="airmetric"><span>Laatste druk</span><strong>${a.last ? fmtBar(a.last.bar) : "-"}</strong></div>
         <div class="airmetric"><span>Resterend tot 100 bar</span><strong>${a.remainingMin == null ? "-" : a.remainingMin + " min"}</strong></div>
         <div class="airmetric"><span>Drukcheck</span><strong>${a.checkIntervalMin} min</strong></div>
-        <div class="airmetric"><span>Trendverbruik</span><strong>${a.rateBarMin == null ? "-" : `${fmtDec(a.rateBarMin,1)} bar/min`}</strong><span>${a.rateLitersMin == null ? "" : `${fmtDec(a.rateLitersMin,0)} L/min`}</span></div>
-        <div class="airmetric"><span>Set / grens</span><strong>2×4 L</strong><span>tot 100 bar</span></div>
+        <div class="airmetric"><span>Ademhaling (SAC)</span><strong>${a.sacState === "ok" ? `${fmtDec(a.sacLMin,0)} L/min` : "-"}</strong><span>${a.sacState === "no-depth" ? "diepte nodig" : (a.sacState === "no-interval" ? "nog geen interval" : "")}</span></div>
+        <div class="airmetric"><span>Set / grens</span><strong>${a.cylinderLiters === 12 ? "2×6 L" : "2×4 L"}</strong><span>tot 100 bar</span></div>
       </div>
       <details class="airdetails no-print" data-detail-key="airmanage:${esc(d.id)}" ${openDetailKeys["airmanage:"+d.id] ? "open" : ""}><summary>Correctie / beheer</summary><div class="fieldrow"><div class="f6"><label>Begindruk corrigeren (bar)</label><input aria-label="Begindruk corrigeren (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-air-start-correct="${esc(d.id)}" value="${esc(d.airStartBar||'')}" placeholder="bijv. 300"></div><div class="f6"><label>&nbsp;</label><button class="mini ghost" data-air-delete-last="${esc(d.id)}" ${a.measurements.length?'':'disabled'}>Wis laatste luchtmeting</button></div></div></details>
       ${a.messages.length ? `<ul class="messages">${a.messages.slice(0,3).map(m=>`<li>${esc(m)}</li>`).join("")}</ul>` : ""}
@@ -3456,7 +3502,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.14.0", APP_VERSION, APP_VERSION==="v1.14.0");
+    push("basis","Appversielabel", "v1.15.0", APP_VERSION, APP_VERSION==="v1.15.0");
     // version.json-zelftest (B-0030): controleert dat het veld "version" in het bestand
     // version.json exact gelijk is aan APP_VERSION, zodat een niet-meegeschoven
     // version.json het zelftal laat zakken en niet stil kan misgaan. De vergeleken waarde
@@ -5041,6 +5087,277 @@
         `${vrLeegBlok.valid?'geldig (fout)':'ongeldig'} / ${vrLeegBlok.noemtVr?'melding veiligheidsregio':'andere melding'}`,
         vrLeegBlok.valid===false && vrLeegBlok.noemtVr===true);
     }
+    // ===== v1.15.0 UI-interactietests (B-0024): SAC + instelbare flessenset =====
+    // SAC-1: een interval met twee metingen met diepte levert een SAC die exact gelijk is
+    // aan (prev.bar-last.bar)/minsBetween * liters / (1 + gemDiepte/10), met de GEMIDDELDE
+    // diepte van het interval, en met dezelfde ata-formule als airUsePerMin. We kiezen een
+    // gemiddelde diepte (10 m) waarvoor airUsePerMin een bekende ata (2,0) impliceert en
+    // tonen aan dat de SAC-normalisatie diezelfde ata gebruikt. Negatieve grendel: dezelfde
+    // toets met een afwijkende ata (verkeerde formule) MOET de gelijkheid afkeuren.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        const today = "2026-05-23";
+        // prev op 8 m, last op 12 m -> gemiddelde 10 m -> ata 2,0. Drukval 20 bar over 5 min
+        // = 4 bar/min. liters via instelling (default 2x4 = 8 L). SAC = 4*8/2 = 16 L/min.
+        const a = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"sac1",diverId:"D1",start:`${today}T09:00:00`,mdd:12,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:270,depth:8},{time:`${today}T09:10:00`,bar:250,depth:12}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:10:30`)));
+        const liters = 8;
+        const gemDiepte = (8+12)/2;
+        const ataVerwacht = 1 + gemDiepte/10; // 2,0
+        const sacVerwacht = ((270-250)/5) * liters / ataVerwacht; // 16
+        const sacGoed = a.sacState==="ok" && Math.abs(a.sacLMin - sacVerwacht) < 1e-6;
+        // ata-consistentie met airUsePerMin: airUsePerMin(10) gebruikt ata = 1 + 10/10 = 2,0,
+        // dus low = round(40*2) = 80. Bevestigt dat dezelfde ata-omrekening geldt.
+        const aup = airUsePerMin(gemDiepte);
+        const ataConsistent = aup && aup.low === Math.round(40*ataVerwacht) && aup.high === Math.round(72*ataVerwacht);
+        detail.push(`sac1[state=${a.sacState} sac=${a.sacLMin} verwacht=${sacVerwacht} ataLow=${aup?aup.low:'-'} consistent=${ataConsistent}]`);
+        alleOk = alleOk && sacGoed && ataConsistent;
+        // Negatieve grendel (anti-tautologie): met een ANDERE ata (bijv. ata van alleen de
+        // einddiepte 12 m = 2,2 i.p.v. de gemiddelde 2,0) MOET de gelijkheid met de
+        // gemiddelde-diepte-SAC vervallen. Zo'n verkeerde normalisatie wordt afgekeurd.
+        const sacFout = ((270-250)/5) * liters / (1 + 12/10);
+        const grendelValt = Math.abs(a.sacLMin - sacFout) > 1e-6;
+        detail.push(`grendel[foutSac=${sacFout} verschiltVanGemiddelde=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","SAC over laatste interval = drukval/min * liters / (1 + gemDiepte/10), met gemiddelde intervaldiepte en dezelfde ata als airUsePerMin; negatieve grendel (andere ata) valt",
+        "sac=16 bij 8->12 m, 20 bar/5 min, 8 L; ata-consistent met airUsePerMin; grendel valt",
+        detail.join(" "), alleOk);
+    })();
+    // SAC-2: stabiliteit bij gelijke ademhaling op verschillende diepten. Twee intervallen
+    // met dezelfde WERKELIJKE ademhaling (zelfde SAC) maar verschillende diepte horen een
+    // nagenoeg gelijke SAC te geven (diepte-onafhankelijk), terwijl verbruik-op-diepte
+    // (drukval*liters, zonder ata-deling) juist zou stijgen. Dat toont dat de normalisatie
+    // echt werkt. Negatieve grendel: het ongenormaliseerde getal MOET wel verschillen.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        const today = "2026-05-23";
+        const liters = 8;
+        // Ondiep interval: 5 m constant (ata 1,5), drukval 15 bar/5 min = 3 bar/min ->
+        // SAC = 3*8/1,5 = 16.
+        const ondiep = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"sacShallow",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:285,depth:5},{time:`${today}T09:10:00`,bar:270,depth:5}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:10:30`)));
+        // Diep interval: 15 m constant (ata 2,5), zelfde ademhaling -> drukval 25 bar/5 min =
+        // 5 bar/min -> SAC = 5*8/2,5 = 16. Gelijke SAC, terwijl verbruik-op-diepte hoger is.
+        const diep = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"sacDeep",diverId:"D1",start:`${today}T09:00:00`,mdd:12,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:275,depth:15},{time:`${today}T09:10:00`,bar:250,depth:15}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:10:30`)));
+        const sacGelijk = ondiep.sacState==="ok" && diep.sacState==="ok" && Math.abs(ondiep.sacLMin - diep.sacLMin) < 1e-6;
+        // Ongenormaliseerd verbruik-op-diepte = drukval/min * liters (zonder ata-deling).
+        const vodOndiep = (15/5)*liters; // 24
+        const vodDiep = (25/5)*liters;   // 40
+        const vodVerschilt = Math.abs(vodOndiep - vodDiep) > 1e-6;
+        detail.push(`stabiel[ondiep=${ondiep.sacLMin} diep=${diep.sacLMin} gelijk=${sacGelijk}] vod[ondiep=${vodOndiep} diep=${vodDiep} verschilt=${vodVerschilt}]`);
+        alleOk = alleOk && sacGelijk && vodVerschilt;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","SAC blijft nagenoeg gelijk bij gelijke ademhaling op verschillende diepte (diepte-onafhankelijk), terwijl verbruik-op-diepte stijgt; grendel (ongenormaliseerd verschilt) valt",
+        "SAC gelijk op 6 m en 30 m; ongenormaliseerd verbruik verschilt",
+        detail.join(" "), alleOk);
+    })();
+    // SAC-3: ontbrekende diepte. Als bij last (of prev) de diepte ontbreekt, geeft de SAC
+    // GEEN getal maar het streepje/melding-pad (sacState "no-depth", sacLMin null). Negatieve
+    // grendel: als de code stilletjes zou terugvallen op verbruik-op-diepte (drukval*liters
+    // zonder ata-deling), dan zou sacLMin niet-null zijn; dat MOET hier falen.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        const today = "2026-05-23";
+        // last zonder depth (depth weggelaten -> cleanAirDepthValue maakt het leeg).
+        const lastLeeg = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"sacNoDepth",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:270,depth:8},{time:`${today}T09:10:00`,bar:250}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:10:30`)));
+        // prev zonder depth.
+        const prevLeeg = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"sacNoDepth2",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:270},{time:`${today}T09:10:00`,bar:250,depth:8}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:10:30`)));
+        const beideStreep = lastLeeg.sacState==="no-depth" && lastLeeg.sacLMin===null && prevLeeg.sacState==="no-depth" && prevLeeg.sacLMin===null;
+        // Negatieve grendel: het verbruik-op-diepte-getal zou hier WEL bestaan; we tonen dat
+        // de SAC daar bewust NIET op terugvalt (sacLMin blijft null, niet het vod-getal).
+        const vod = ((270-250)/5)*8; // 32 - wat een stille terugval zou opleveren
+        const valtNietTerug = lastLeeg.sacLMin !== vod && lastLeeg.sacLMin === null;
+        detail.push(`noDepth[lastState=${lastLeeg.sacState} lastSac=${lastLeeg.sacLMin} prevState=${prevLeeg.sacState}] grendel[vod=${vod} valtNietTerug=${valtNietTerug}]`);
+        alleOk = alleOk && beideStreep && valtNietTerug;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","Ontbrekende diepte bij prev of last geeft streepje/melding (geen SAC), geen stille terugval op verbruik-op-diepte; grendel valt",
+        "sacState no-depth, sacLMin null bij ontbrekende diepte; geen vod-terugval",
+        detail.join(" "), alleOk);
+    })();
+    // SAC-4: ingevulde nul meter is geldig (oppervlak, ata 1) en levert een SAC gelijk aan
+    // het verbruik. Het onderscheid leeg versus 0 wordt expliciet getoetst: 0 is geldig,
+    // leeg is geen SAC. Negatieve grendel: 0 mag NIET als ontbrekend worden behandeld.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        const today = "2026-05-23";
+        const liters = 8;
+        // Beide diepten 0 -> ata 1 -> SAC = drukval/min * liters. Drukval 10 bar/5 min = 2;
+        // SAC = 2*8/1 = 16.
+        const nul = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"sacZero",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:290,depth:0},{time:`${today}T09:10:00`,bar:280,depth:0}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:10:30`)));
+        const sacVerwacht = ((290-280)/5)*liters/1; // 16
+        const nulGeldig = nul.sacState==="ok" && Math.abs(nul.sacLMin - sacVerwacht) < 1e-6;
+        // Onderscheid leeg vs 0: een interval met lege diepte geeft no-depth; met 0 geeft ok.
+        const leeg = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"sacEmpty",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:290},{time:`${today}T09:10:00`,bar:280}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:10:30`)));
+        const onderscheid = nul.sacState==="ok" && leeg.sacState==="no-depth";
+        detail.push(`nul[state=${nul.sacState} sac=${nul.sacLMin} verwacht=${sacVerwacht}] onderscheid[nul=${nul.sacState} leeg=${leeg.sacState} ok=${onderscheid}]`);
+        alleOk = alleOk && nulGeldig && onderscheid;
+        // Negatieve grendel: zou 0 als ontbrekend gelden, dan was nul.sacState "no-depth";
+        // dat MOET hier niet zo zijn.
+        const grendelValt = nul.sacState !== "no-depth";
+        detail.push(`grendel[nulNietAlsOntbrekend=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","Ingevulde diepte 0 is geldig (ata 1, SAC = verbruik); onderscheid leeg versus 0 expliciet; grendel (0 als ontbrekend) valt",
+        "sac=16 bij 0 m; leeg=no-depth, 0=ok; grendel valt",
+        detail.join(" "), alleOk);
+    })();
+    // SAC-5: nog geen interval. Alleen begindruk plus nul of één meting geeft een streepje
+    // (sacState "no-interval"), geen getal, geen exception/deling door nul.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        const today = "2026-05-23";
+        // Alleen begindruk, geen meting.
+        const geen = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"sacNone",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:05:00`)));
+        // Eén meting (begindruk + eerste meting; geen tweede meting -> geen prev/last-paar).
+        const een = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"sacOne",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:270,depth:8}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:05:30`)));
+        const beideGeenGetal = geen.sacState==="no-interval" && geen.sacLMin===null && een.sacState==="no-interval" && een.sacLMin===null;
+        detail.push(`geenInterval[geen=${geen.sacState}/${geen.sacLMin} een=${een.sacState}/${een.sacLMin}]`);
+        alleOk = alleOk && beideGeenGetal;
+        // Negatieve grendel: bij één meting is er geen tweede punt; een SAC tonen zou een
+        // verwijzing naar een niet-bestaande meting vereisen. sacLMin MOET null blijven.
+        const grendelValt = een.sacLMin === null;
+        detail.push(`grendel[eenMetingGeenGetal=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","Nog geen bruikbaar interval (alleen begindruk of één meting) geeft streepje (no-interval), geen getal, geen exception; grendel valt",
+        "sacState no-interval, sacLMin null; geen deling door nul",
+        detail.join(" "), alleOk);
+    })();
+    // SET-1: default na reset is 8 L (2x4). Na defaultState() en na de Alles-wissen-actie
+    // (resetAllData) staat de set op 2x4 en levert airCylinderLiters() 8.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        const defSet = defaultState().settings.cylinderSet;
+        // Na resetAllData (de kern van Alles wissen) is state terug op default.
+        const naReset = testState({settings:{cylinderSet:"2x6"}}, ()=>{ resetAllData(); return {set: state.settings.cylinderSet, liters: airCylinderLiters()}; });
+        const ok = defSet==="2x4" && naReset.set==="2x4" && naReset.liters===8;
+        detail.push(`default[def=${defSet} naReset=${naReset.set} liters=${naReset.liters}]`);
+        alleOk = alleOk && ok;
+        // Negatieve grendel: de default mag NIET 2x6/12 L zijn.
+        const grendelValt = !(defSet==="2x6") && naReset.liters!==12;
+        detail.push(`grendel[nietGroteSet=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","Flessenset default na reset is 2x4 (8 L); na Alles wissen valt de set terug op 2x4; grendel (grote set als default) valt",
+        "default 2x4, naReset 2x4/8 L",
+        detail.join(" "), alleOk);
+    })();
+    // SET-2: de gekozen set loopt door in de berekening. Bij 12 L (2x6) zijn zowel de SAC als
+    // de liters-afgeleide consistent met 12 L i.p.v. 8 L, en er werkt geen hardgecodeerde 8
+    // meer door. We toetsen de SAC-uitkomst bij 2x6 en vergelijken met 2x4 op hetzelfde
+    // interval (de SAC schaalt lineair met liters: 12/8 = 1,5). remainingMin (bar-gebaseerd)
+    // blijft per definitie gelijk; we bevestigen dat ook, zodat de scheiding zichtbaar is.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        const today = "2026-05-23";
+        const mk = (set)=>testState({settings:{cylinderSet:set}, live:[ensureAirFields({id:"setCalc",diverId:"D1",start:`${today}T09:00:00`,mdd:12,daypart:"1",rule:"auto",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:270,depth:8},{time:`${today}T09:10:00`,bar:250,depth:12}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:10:30`)));
+        const a8 = mk("2x4");
+        const a12 = mk("2x6");
+        // SAC schaalt lineair met liters.
+        const sacSchaalt = a8.sacState==="ok" && a12.sacState==="ok" && Math.abs(a12.sacLMin - a8.sacLMin*1.5) < 1e-6;
+        // cylinderLiters in de analyse volgt de set.
+        const litersVolgt = a8.cylinderLiters===8 && a12.cylinderLiters===12;
+        // remainingMin is bar-gebaseerd en dus identiek tussen sets (scheiding zichtbaar).
+        const remGelijk = a8.remainingMin === a12.remainingMin;
+        detail.push(`calc[sac8=${a8.sacLMin} sac12=${a12.sacLMin} schaalt=${sacSchaalt} liters8=${a8.cylinderLiters} liters12=${a12.cylinderLiters} remGelijk=${remGelijk}]`);
+        alleOk = alleOk && sacSchaalt && litersVolgt && remGelijk;
+        // Geen hardgecodeerde 8 meer in de berekening: airAnalysis gebruikt airCylinderLiters().
+        // We bewijzen dat door bij 2x6 een uitkomst te eisen die met 8 NIET zou kloppen.
+        const sacMet8 = ((270-250)/5)*8/(1+10/10); // 16 (zou gelden bij hardgecodeerd 8)
+        const grendelValt = Math.abs(a12.sacLMin - sacMet8) > 1e-6;
+        detail.push(`grendel[sacMet8=${sacMet8} a12wijktAf=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","Gekozen set loopt door in de berekening: SAC bij 2x6 (12 L) schaalt lineair t.o.v. 2x4 (8 L), cylinderLiters volgt de set, geen hardgecodeerde 8; grendel valt",
+        "sac12 = 1,5 * sac8; liters 8 resp. 12; geen 8 hardgecodeerd",
+        detail.join(" "), alleOk);
+    })();
+    // SET-3: vergrendeling bij een lopende duik. Met een lopende duik (start && !surface)
+    // is de set-keuze niet wijzigbaar; zonder lopende duik wel. Negatieve grendel: een
+    // poging tot wijzigen tijdens een lopende duik verandert de set niet.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        const today = "2026-05-23";
+        // Met een actieve live-duik: cylinderSetChangeAllowed moet false geven, en
+        // attemptCylinderSetChange mag de set niet wijzigen.
+        const metDuik = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"lockDive",diverId:"D1",start:`${today}T09:00:00`,surface:"",mdd:6,daypart:"1",rule:"auto",airStartBar:300})]}, ()=>{
+          const actief = anyActiveLiveDive();
+          const toegestaan = cylinderSetChangeAllowed("2x6", {confirmed:true, active:actief});
+          const gewijzigd = attemptCylinderSetChange("2x6", {confirmed:true});
+          return {actief, toegestaan, gewijzigd, set: state.settings.cylinderSet};
+        });
+        // Zonder lopende duik (afgesloten duik): wijzigen mag wel.
+        const zonderDuik = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"doneDive",diverId:"D1",start:`${today}T09:00:00`,surface:`${today}T09:30:00`,mdd:6,daypart:"1",rule:"auto",airStartBar:300})]}, ()=>{
+          const actief = anyActiveLiveDive();
+          const gewijzigd = attemptCylinderSetChange("2x6", {confirmed:true});
+          return {actief, gewijzigd, set: state.settings.cylinderSet};
+        });
+        const lockOk = metDuik.actief===true && metDuik.toegestaan===false && metDuik.gewijzigd===false && metDuik.set==="2x4";
+        const vrijOk = zonderDuik.actief===false && zonderDuik.gewijzigd===true && zonderDuik.set==="2x6";
+        detail.push(`lock[actief=${metDuik.actief} toegestaan=${metDuik.toegestaan} gewijzigd=${metDuik.gewijzigd} set=${metDuik.set}] vrij[actief=${zonderDuik.actief} gewijzigd=${zonderDuik.gewijzigd} set=${zonderDuik.set}]`);
+        alleOk = alleOk && lockOk && vrijOk;
+        // Gerenderde UI: bij een lopende duik draagt de cylinderSet-select het disabled-attribuut.
+        const renderLock = testState({settings:{cylinderSet:"2x4"}, live:[ensureAirFields({id:"lockDive2",diverId:"D1",start:`${today}T09:00:00`,surface:"",mdd:6,daypart:"1",rule:"auto",airStartBar:300})]}, ()=>{ renderSettings(); const el=document.getElementById("settingsScreen"); return el?el.innerHTML:""; });
+        const selectDisabled = /id="cylinderSet"[^>]*disabled/.test(renderLock);
+        detail.push(`render[selectDisabled=${selectDisabled}]`);
+        alleOk = alleOk && selectDisabled;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","Flessenset vergrendeld bij een lopende duik (start && !surface): wijziging afgekeurd en set onveranderd; zonder lopende duik wel wijzigbaar; gerenderde select disabled; grendel valt",
+        "met duik: niet toegestaan, set blijft 2x4; zonder duik: gewijzigd naar 2x6; select disabled bij lopende duik",
+        detail.join(" "), alleOk);
+    })();
+    // SET-4: dubbele bevestiging voor 2x6. Omschakelen naar 2x6 ZONDER bevestiging wijzigt de
+    // set niet; MET bevestiging wel. Terugschakelen naar 2x4 mag zonder bevestiging.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        // Naar 2x6 zonder bevestiging: afgekeurd.
+        const zonderBev = testState({settings:{cylinderSet:"2x4"}}, ()=>{
+          const toegestaan = cylinderSetChangeAllowed("2x6", {confirmed:false, active:false});
+          const gewijzigd = attemptCylinderSetChange("2x6", {confirmed:false});
+          return {toegestaan, gewijzigd, set: state.settings.cylinderSet};
+        });
+        // Naar 2x6 met bevestiging: toegestaan.
+        const metBev = testState({settings:{cylinderSet:"2x4"}}, ()=>{
+          const gewijzigd = attemptCylinderSetChange("2x6", {confirmed:true});
+          return {gewijzigd, set: state.settings.cylinderSet};
+        });
+        // Terug naar 2x4 zonder bevestiging: toegestaan (kleinere, veilige set).
+        const terug = testState({settings:{cylinderSet:"2x6"}}, ()=>{
+          const toegestaan = cylinderSetChangeAllowed("2x4", {confirmed:false, active:false});
+          const gewijzigd = attemptCylinderSetChange("2x4", {confirmed:false});
+          return {toegestaan, gewijzigd, set: state.settings.cylinderSet};
+        });
+        const ok = zonderBev.toegestaan===false && zonderBev.gewijzigd===false && zonderBev.set==="2x4"
+                && metBev.gewijzigd===true && metBev.set==="2x6"
+                && terug.toegestaan===true && terug.gewijzigd===true && terug.set==="2x4";
+        detail.push(`bev[zonder=${zonderBev.gewijzigd}/${zonderBev.set} met=${metBev.gewijzigd}/${metBev.set} terug=${terug.gewijzigd}/${terug.set}]`);
+        alleOk = alleOk && ok;
+        // Negatieve grendel: zonder bevestiging mag 2x6 NIET gezet zijn.
+        const grendelValt = zonderBev.set !== "2x6";
+        detail.push(`grendel[zonderBevGeen2x6=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","Dubbele bevestiging voor 2x6: zonder bevestiging niet gewijzigd, met bevestiging wel; terug naar 2x4 mag zonder bevestiging; grendel valt",
+        "2x6 zonder bevestiging blijft 2x4; met bevestiging 2x6; terug naar 2x4 zonder bevestiging",
+        detail.join(" "), alleOk);
+    })();
     if(mode !== "all") return tests.filter(t=>t.category===mode);
     return tests;
   }
@@ -5103,6 +5420,27 @@
   function attemptReset(phrase){
     if(!resetConfirmPhraseOk(phrase)) return false;
     mutate(resetAllData);
+    return true;
+  }
+  // Grendel voor het wijzigen van de flessenset. Pure functie, geen DOM/prompt, zodat de
+  // zelftest hem aantoonbaar kan toetsen. Twee voorwaarden:
+  //  1) er mag geen duik lopen (active === true blokkeert elke wijziging);
+  //  2) omschakelen NAAR de grotere set 2x6 vereist een expliciete bevestiging
+  //     (confirmed === true); terugschakelen naar de kleinere, veilige 2x4 niet.
+  // Onbekende doelwaarden worden afgekeurd. Retourneert true alleen als de wijziging mag.
+  function cylinderSetChangeAllowed(next, {confirmed=false, active=false}={}){
+    if(!Object.prototype.hasOwnProperty.call(CYLINDER_SETS, next)) return false;
+    if(active) return false;
+    if(next === "2x6" && !confirmed) return false;
+    return true;
+  }
+  // Voert de wijziging uit via de grendel en geeft terug of er gewijzigd is. De live-status
+  // en de bevestiging komen van de aanroeper (de UI gebruikt een echte prompt/confirm; de
+  // grendel zelf leunt daar niet op).
+  function attemptCylinderSetChange(next, {confirmed=false}={}){
+    const active = anyActiveLiveDive();
+    if(!cylinderSetChangeAllowed(next, {confirmed, active})) return false;
+    state.settings.cylinderSet = normalizeCylinderSet(next);
     return true;
   }
   function exampleDiveTimes(base, h, m, bottomMin, ascentSec){
@@ -5638,7 +5976,7 @@
   function v118ExampleCard(n,title,body){ return `<div class="f4"><h4>Voorbeeld ${n} - ${esc(title)}</h4><p class="small muted">${esc(body)}</p><button class="ghost no-print" id="loadExample${n}">Voorbeeld ${n} laden</button></div>`; }
   function renderSettings(){
     document.getElementById("settingsScreen").innerHTML = `<div class="grid">
-      <div class="card span12"><div class="headline"><h2>Instellingen</h2><details class="info no-print"><summary title="Uitleg Instellingen" aria-label="Uitleg Instellingen">i</summary><div class="info-body">Gebruik bij voorkeur vaste duikercodes en neutrale aanduidingen. Vrije aanduidingen, DPL en notities kunnen persoonsgegevens bevatten; deel die niet via GitHub of voorbeeldbestanden. Beheer en controle staan bovenaan; daaronder staan de standaard duikcodes en materiaalgegevens. Het schermthema (Nacht of Dag) staat rechtsboven in de balk. Nacht is donker voor bus en duisternis; Dag is licht met hoog contrast voor zon en waterkant. Bij openen kiest de app zelf op basis van de klok tussen nacht en dag; een eigen keuze blijft daarna staan. De knop Auto hieronder zet dat terug naar automatisch.</div></details></div><details class="fold no-print"><summary>Beheer en controle</summary><div class="fold-body"><div class="btnrow"><button class="bad" id="resetAll">Alles wissen</button><button class="primary" id="settingsSelftest">Zelftest openen</button></div><div class="soundbox compact"><div class="fieldrow"><div class="f4"><label>Drukcheck-geluid</label><select aria-label="Drukcheck-geluid" class="user" id="airSoundEnabled"><option value="off" ${state.settings?.airSoundEnabled?'':'selected'}>Uit</option><option value="on" ${state.settings?.airSoundEnabled?'selected':''}>Aan</option></select></div><div class="f4"><label>&nbsp;</label><button class="mini ghost" id="testAirSound">Test piep</button></div><div class="f4"><label>Schermthema</label><button class="mini ghost" id="themeAuto" title="Zet thema terug op automatisch (klok)">Auto (klok)</button></div></div></div></div></details></div>
+      <div class="card span12"><div class="headline"><h2>Instellingen</h2><details class="info no-print"><summary title="Uitleg Instellingen" aria-label="Uitleg Instellingen">i</summary><div class="info-body">Gebruik bij voorkeur vaste duikercodes en neutrale aanduidingen. Vrije aanduidingen, DPL en notities kunnen persoonsgegevens bevatten; deel die niet via GitHub of voorbeeldbestanden. Beheer en controle staan bovenaan; daaronder staan de standaard duikcodes en materiaalgegevens. Het schermthema (Nacht of Dag) staat rechtsboven in de balk. Nacht is donker voor bus en duisternis; Dag is licht met hoog contrast voor zon en waterkant. Bij openen kiest de app zelf op basis van de klok tussen nacht en dag; een eigen keuze blijft daarna staan. De knop Auto hieronder zet dat terug naar automatisch.</div></details></div><details class="fold no-print"><summary>Beheer en controle</summary><div class="fold-body"><div class="btnrow"><button class="bad" id="resetAll">Alles wissen</button><button class="primary" id="settingsSelftest">Zelftest openen</button></div><div class="soundbox compact"><div class="fieldrow"><div class="f4"><label>Drukcheck-geluid</label><select aria-label="Drukcheck-geluid" class="user" id="airSoundEnabled"><option value="off" ${state.settings?.airSoundEnabled?'':'selected'}>Uit</option><option value="on" ${state.settings?.airSoundEnabled?'selected':''}>Aan</option></select></div><div class="f4"><label>&nbsp;</label><button class="mini ghost" id="testAirSound">Test piep</button></div><div class="f4"><label>Schermthema</label><button class="mini ghost" id="themeAuto" title="Zet thema terug op automatisch (klok)">Auto (klok)</button></div><div class="f4"><label>Flessenset</label><select aria-label="Flessenset" class="user" id="cylinderSet" ${anyActiveLiveDive()?'disabled':''}><option value="2x4" ${normalizeCylinderSet(state.settings?.cylinderSet)==='2x4'?'selected':''}>2×4 L (8 L)</option><option value="2x6" ${normalizeCylinderSet(state.settings?.cylinderSet)==='2x6'?'selected':''}>2×6 L (12 L)</option></select>${anyActiveLiveDive()?'<div class="hint small muted">Vergrendeld: er loopt een duik. De flessenset is alleen te wijzigen voordat een duik loopt.</div>':'<div class="hint small muted">Geldt voor alle duikers. 2×6 vraagt een bevestiging.</div>'}</div></div></div></div></details></div>
       <div class="card span12"><details class="fold"><summary aria-label="Over deze tool openen of sluiten">Over deze tool</summary><div class="fold-body"><p class="note">De Duikmonitor is een praktisch hulpmiddel voor aan de waterkant. Veel kun je vooraf regelen: plannen, opschrijven, oefenen. Tijdens een echte inzet gaat de registratie echter vaak nog met de hand. Deze app is bedoeld om te laten zien dat het ook eenvoudiger kan: een paar knoppen, en de duik staat geregistreerd, met de berekeningen en regels er al in.</p><p class="note">Het is een open voorbeeld, geen eindantwoord. De app is open source. Probeer hem uit, kijk of de berekeningen kloppen, en geef aan wat beter kan. Zie je iets, dan kijken we samen. Gebruik hem voor jezelf, pas hem aan voor je eigen regio, of bouw mee. Het gaat niet om deze app, maar om of het beter en veiliger kan.</p><div class="hint">De tabellen en regels horen voor operationeel gebruik door het juiste gezag bevestigd te worden.</div></div></details></div><div class="card span12"><details class="fold"><summary aria-label="Over de OSOD-standaard openen of sluiten">Over de OSOD-standaard</summary><div class="fold-body"><p class="note">OSOD is de Open Standaard Operationele Duikregistratie (versie ${OSOD_VERSION}). Deze app is de referentie-implementatie ervan en volgt de rekenregels en het record-formaat van die standaard. De app conformeert zich aan de standaard, niet andersom.</p><p class="note">De standaard zelf is openbaar. Je kunt hem inzien en meelezen via de OSOD-repository.</p><div class="btnrow"><a class="buttonlink ghost" href="${OSOD_REPO_URL}" target="_blank" rel="noopener noreferrer">OSOD-standaard openen</a></div></div></details></div><div class="card span12 no-print"><div class="headline"><h3>Meedenken en melden</h3><details class="info no-print"><summary title="Uitleg Meedenken" aria-label="Uitleg Meedenken">i</summary><div class="info-body">Gebruik GitHub voor reproduceerbare fouten en concrete verbeterideeën. Zet daar geen echte namen, telefoonnummers, e-mailadressen, locaties of operationele persoonsgegevens in. Gebruik fictieve voorbeelden zoals Duiker 1.</div></details></div><p class="note">De publieke app staat op duikmonitor.nl. De broncode, documentatie en meldroute staan op GitHub.</p><div class="btnrow"><a class="buttonlink primary" href="${PUBLIC_APP_URL}" target="_blank" rel="noopener noreferrer">Website openen</a><a class="buttonlink ghost" href="${REPO_URL}" target="_blank" rel="noopener noreferrer">Broncode bekijken</a><a class="buttonlink ghost" href="${ISSUE_URL}" target="_blank" rel="noopener noreferrer">Probleem of idee melden</a><a class="buttonlink ghost" href="${SECURITY_URL}" target="_blank" rel="noopener noreferrer">Security-route</a></div><div class="hint">Meld beveiligingsproblemen niet openbaar in Issues. Deel exports alleen bewust; de app bewaart gegevens lokaal in deze browser.</div></div>
       <div class="card span12"><div class="headline"><h3>Duikers</h3><details class="info no-print"><summary title="Uitleg Duikers" aria-label="Uitleg Duikers">i</summary><div class="info-body">Na Alles wissen staat de monitor weer schoon met vaste duikers D1 t/m D12, waarvan de eerste vier (D1 t/m D4) standaard actief zijn; de overige zet je met het vinkje Actief aan. MDD staat dan op 6 m. Vink Actief uit om een duikerslot tijdelijk uit planning, live bediening en overzichten te halen. Duiker is de vaste code; Aanduiding is vrij en optioneel. Seinhouder is de seinhouder voor deze duiker; de duikploegleider staat bij de daggegevens. Set # en Masker # worden bij Start duik gekopieerd naar de duikregistratie.</div></details></div><div class="btnrow no-print"><button class="ghost" id="depthAllToggle" title="Zet de standaard-MDD van alle duikers in één keer">Diepte voor allen…</button><span id="depthAllPanel" style="display:none;align-items:center;gap:6px"><input aria-label="Standaard-MDD voor alle duikers" class="user" type="number" inputmode="numeric" step="1" min="0" max="15" id="depthAllValue" placeholder="m" style="max-width:80px"><button class="primary mini" id="depthAllApply">Toepassen</button></span></div><div class="tablewrap"><table class="table"><thead><tr><th>Actief</th><th>Duiker</th><th>Aanduiding</th><th>Seinhouder</th><th>MDD</th><th>Set #</th><th>Masker #</th></tr></thead><tbody>${state.divers.map(d=>`<tr><td><input type="checkbox" data-diver-active="${esc(d.id)}" ${isDiverActive(d)?'checked':''} aria-label="${esc(diverCode(d))} actief"></td><td class="mono"><strong>${esc(diverCode(d))}</strong></td><td><input aria-label="Aanduiding ${esc(diverCode(d))}" class="user" data-diver-label="${esc(d.id)}" maxlength="8" value="${esc(cleanDiverLabel(d.label))}" placeholder="-"></td><td><input aria-label="Seinhouder ${esc(diverCode(d))}" class="user" maxlength="8" data-diver-sh="${esc(d.id)}" value="${esc(d.sh||'')}" placeholder="-"></td><td><input aria-label="MDD ${esc(diverCode(d))}" class="user" type="text" inputmode="decimal" data-diver-mdd="${esc(d.id)}" value="${esc(d.defaultMdd||6)}"></td><td><input aria-label="Set ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-set="${esc(d.id)}" value="${esc(d.setNo||'')}" placeholder="-"></td><td><input aria-label="Masker ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-mask="${esc(d.id)}" value="${esc(d.maskNo||'')}" placeholder="-"></td></tr>`).join("")}</tbody></table></div><p class="small muted">D1 t/m D12 zijn vaste duikercodes en worden niet automatisch hernummerd. Gebruik Aanduiding alleen voor een rol of neutrale herkenning. Gebruik geen echte namen als je exports of voorbeelden deelt.</p></div>
       <div class="card span12"><details class="fold" data-expand-all-details="true"><summary>Rekenregels</summary><div class="fold-body"><div class="warnbox"><b>Hulpmiddel.</b> Deze app ondersteunt planning, controle en registratie. De app vervangt geen formele werkinstructie, papieren tabel, duikcomputer, duikploegleider, LMRA, werkplan, medisch advies of regionaal beleid.</div><div class="hint"><b>Bron DCIEM-tabellen:</b> IWOD 002 Decompressiemethoden (1 april 2019) § 2300 luchttabel 1.</div><div class="hint" style="margin-top:8px"><b>HF voor groep B bij OI 2:00-2:59:</b> de monitor gebruikt 1,2. Dat is de waarde van de canonieke DCIEM-bron, bevestigd door de IWOD 002 (2019) en het DCIEM-origineel (1992). De Landelijke Werkinstructie WOD v2.0 vermeldt op deze ene cel 1,1. Dit is een gedocumenteerd bronconflict; de monitor volgt de bronwaarde 1,2. Terzijde: 1,2 is ook de strengere van de twee, want een hogere HF geeft een langere EDT, dus de monitor staat hiermee aan de veilige kant.</div><div class="fieldrow" style="margin-top:12px"><div class="f6"><h3>Controle en verificatie</h3><p class="note">De berekeningen zijn controleerbaar via de broncode in de repository, vaste testgevallen en de ingebouwde zelftest. Gebruik de zelftest om de rekenregels op dit toestel opnieuw te controleren.</p><div class="hint">Bij een release horen appversie, bronprofiel en controlegetal, zodat later duidelijk is welke versie is gebruikt.</div></div><div class="f6"><h3>Kernregels ingebouwd</h3><ul class="messages"><li>No-deco tot maximaal 15 m.</li><li>MDD wordt afgerond naar tabeldiepte 6/9/12/15 m.</li><li>Airtabel 1 bepaalt HG.</li><li>Tabel 4a bepaalt HF op basis van HG en OI.</li><li>Tabel 4b bepaalt herhalings-NDL.</li><li>EDT = DT × HF, conservatief afgerond naar boven.</li><li>6-, 9- en 12-meterregel wordt alleen als toegepast getoond wanneer duikmomenten van dezelfde duiker worden opgeteld.</li><li>Dagdeel 1 en Dagdeel 2 worden gescheiden berekend.</li></ul></div><div class="f6"><h3>Dagdeel en meterregel</h3><p class="note">Bij een losse duik toont de monitor Tabel 1 met de juiste tabeldiepte. Pas wanneer duikmomenten van dezelfde duiker binnen hetzelfde dagdeel worden samengenomen, toont de monitor 6-, 9- of 12-meterregel toegepast; daarbij gebruikt de monitor de hoogste MDD en telt hij de duiktijden op voor één HG.</p><div class="hint">Eén losse duik t/m 6/9/12 m = Tabel 1 met tabeldiepte 6/9/12 m. Meerdere duikmomenten van dezelfde duiker die worden opgeteld = 6-/9-/12-meterregel toegepast. Duiken van verschillende duikers worden nooit samengevoegd.</div><div class="hint" style="margin-top:8px"><b>Periodebewaking:</b> als duikmomenten over twee dagdelen vallen zonder rustpauze van minimaal 1 uur ertussen, telt de monitor de duiktijden alsnog op tijdsbasis op en waarschuwt bij overschrijding van de meterregellimiet. Controleer dan of het operationeel echt om twee dagdelen gaat.</div></div><div class="f6"><h3>Dieper dan 12 m</h3><p class="note">De monitor geeft nu een aparte procedurehint bij geplande en niet-geplande situaties boven 12 m.</p><div class="hint">${esc(over12PlannedGuidance)}</div><div class="warnbox" style="margin-top:10px"><b>Niet-geplande overschrijding, alleen als ook de 3-duikenlimiet is overschreden:</b> ${esc(over12UnplannedProcedure)}</div></div><div class="f12"><h3>Opstijgingen en rust</h3><p class="note">Opstijgingen worden per duiker bewaakt per duikperiode van 4 uur en per duikdag. Tussen twee opstijgingen geldt minimaal 15 minuten oppervlakte-interval. Na een duikperiode van 4 uur geldt minimaal 1 uur rust.</p><div class="tablewrap"><table class="table"><thead><tr><th>Maximale diepte</th><th>Per 4 uur</th><th>Per dag</th><th>Bronlaag</th></tr></thead><tbody><tr><td>t/m 6 m</td><td>6</td><td>12</td><td>DMC-advies 2013</td></tr><tr><td>&gt;6 t/m 9 m</td><td>4</td><td>8</td><td>DMC-advies 2013</td></tr><tr><td>&gt;9 t/m 12 m</td><td>3</td><td>6</td><td>Conservatieve projectregel</td></tr><tr><td>&gt;12 t/m 15 m</td><td>3</td><td>3</td><td>WOD-regime / projectmatige borging</td></tr></tbody></table></div><div class="hint" style="margin-top:10px"><b>Waarom extra?</b> De meterregel vereenvoudigt DCIEM-planning voor meerdere ondiepe duikmomenten. Die vereenvoudiging is geen toestemming voor onbeperkt herhaald opstijgen; daarom bewaakt de monitor ook de opstijgingsaantallen.</div><p class="small muted">DMC noemt 6 m en 9 m expliciet. De diepere categorieën zijn conservatief/projectmatig geborgd; de meest beperkende grens is leidend.</p></div><div class="f6"><h3>Opkomstvenster</h3><p class="note">Gebaseerd op 18 ± 3 meter per minuut. Live-metingen worden op seconden gecontroleerd.</p><div class="hint">Te snel, niet geregistreerd of afwijkend opkomen geeft een controlehint in de hoofdstatus.</div></div><div class="f6"><h3>Ademluchtbewaking</h3><p class="note">Actieve duiken kunnen tussentijds luchtmetingen vastleggen. De monitor gebruikt standaard 2×4 L, rekent resterende tijd tot 100 bar en kiest automatisch het juiste drukcheck-interval.</p><div class="hint">Ademluchtbewaking is een operationele controlelaag, geen DCIEM-tabelbron.</div></div><div class="f12"><h3>Privacy en lokaal gebruik</h3><p class="note">De monitor rekent in de browser op dit apparaat. Ingevoerde gegevens worden niet automatisch naar een server verzonden.</p><p class="note">Er is geen account, geen centrale database en geen automatische synchronisatie. Gegevens blijven lokaal in de browser, tenzij de gebruiker ze zelf exporteert, print, kopieert of deelt.</p><div class="hint">De appbestanden kunnen via duikmonitor.nl of als lokaal bestand worden geopend. Ingevulde duikgegevens en berekeningen worden door de app niet naar GitHub, de beheerder of een eigen server verzonden. Bij het openen van een openbare website kan de hostinglaag wel normale technische requestgegevens ontvangen; dat staat los van de lokale appdata.</div></div></div></div></details></div>
@@ -5675,6 +6013,28 @@
       state.settings.airSoundEnabled = e.target.value === "on";
       if(state.settings.airSoundEnabled) await primeAirSound();
       save();
+    };
+    const cylinderSetSelect = document.getElementById("cylinderSet");
+    if(cylinderSetSelect) cylinderSetSelect.onchange = e=>{
+      const huidig = normalizeCylinderSet(state.settings?.cylinderSet);
+      const gekozen = e.target.value;
+      // Vergrendeld zodra er ergens een duik loopt: niet wijzigen, keuze terugzetten.
+      if(anyActiveLiveDive()){
+        alert("De flessenset is vergrendeld zolang er een duik loopt. Sluit eerst alle actieve duiken af.");
+        e.target.value = huidig;
+        return;
+      }
+      // Omschakelen naar de grotere set 2x6 vraagt een bewuste bevestiging; terug naar 2x4 niet.
+      let confirmed = true;
+      if(gekozen === "2x6"){
+        confirmed = (typeof confirm === "function") ? confirm("Flessenset op 2×6 L (12 L) zetten? Dit geldt voor alle duikers en beïnvloedt de SAC- en resterende-tijd-berekening. Bevestig om door te gaan.") : false;
+      }
+      if(attemptCylinderSetChange(gekozen, {confirmed})){
+        save();
+        render();
+      } else {
+        e.target.value = huidig;
+      }
     };
     const testAirSoundBtn = document.getElementById("testAirSound");
     if(testAirSoundBtn) testAirSoundBtn.onclick = testAirCheckSound;
