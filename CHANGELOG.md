@@ -2,6 +2,28 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.15.0] - 2026-06-23
+
+Twee samenhangende wijzigingen aan de luchtweergave aan de waterkant: de monitor toont voortaan een ademhalingsindicatie (SAC) die de inspanning van de duiker zelf volgt, los van de diepte, en de flesinhoud is instelbaar geworden tussen 2x4 L en 2x6 L.
+
+### Toegevoegd
+
+- Een ademhalingsindicatie (SAC, Surface Air Consumption) aan de waterkant. De SAC wordt over het laatste meetinterval berekend en teruggerekend naar de oppervlakte, zodat het getal bij rustige ademhaling stabiel blijft, ook als de duiker op- en afdaalt. Loopt het op, dan werkt de duiker harder, ongeacht de diepte. De SAC is een live-hulpgetal: hij wordt nergens opgeslagen, niet in de registratie opgenomen en niet geexporteerd. Bij een nog onvolledig interval of een ontbrekende diepte bij een meting toont het veld een streepje met een korte melding in plaats van een getal; een ingevulde diepte van 0 m (oppervlak) geldt als geldige waarde.
+- Een instelbare flessenset op de Instellingen-pagina, omschakelbaar tussen 2x4 L (8 L) en 2x6 L (12 L), geldig voor alle duikers. Omschakelen naar 2x6 L vraagt een bevestiging; terugschakelen naar 2x4 L niet. De keuze is vergrendeld zolang er een duik loopt, zodat de flesinhoud niet halverwege een actieve duik kan veranderen. Na "Alles wissen" valt de set terug op de veilige standaard 2x4 L.
+- Negen zelftests die de berekening en de bediening echt nadoen en de uitkomst controleren: de SAC-normalisatie over het laatste interval met de gemiddelde intervaldiepte, de stabiliteit bij gelijke ademhaling op verschillende diepte, de afhandeling van een ontbrekende diepte, het onderscheid tussen een lege en een nul-diepte, het streepje bij een nog onvolledig interval, de standaard 2x4 L na reset, het doorwerken van de gekozen set in de berekening, de vergrendeling tijdens een lopende duik en de bevestiging bij 2x6 L. Elke zelftest heeft een tegencontrole tegen tautologie.
+
+### Gewijzigd
+
+- Het Trendverbruik-blok toont voortaan de SAC in L/min in plaats van de drukval per minuut (bar/min) en het verbruik op diepte (l/min). Die laatste twee waren een weergave op diepte en daardoor misleidend als ademhalingssignaal; ze zijn vervangen, niet aangevuld.
+- De flesinhoud is niet langer vast op 8 L maar komt uit de instelling. De gekozen set werkt door in zowel de SAC als de berekening van de resterende tijd tot 100 bar.
+- Appversielabel verhoogd naar v1.15.0; de bijbehorende zelftest controleert mee op v1.15.0. version.json bijgewerkt naar v1.15.0.
+- Het opstart-zelftal gaat van 391 naar 400 door de negen nieuwe zelftests met hun tegencontroles.
+
+### Niet gewijzigd
+
+- De luchtveiligheidsberekening blijft ongewijzigd: de drukval per minuut, de resterende tijd tot 100 bar en het drukcheck-interval draaien onverminderd op de bestaande logica die de hoogste van twee verbruikssnelheden gebruikt. De SAC komt er als een tweede, los getal naast en verandert daar niets aan.
+- Rekenkern, DCIEM-tabellen, rekenbronfingerprint, blokkeerlogica, statussemantiek, validatie en schema zijn niet aangeraakt. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd, evenals het gedrag van de updatecontrole en de in v1.12.0 vastgelegde plaatsing van de versiemelding. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.14.0] - 2026-06-23
 
 Twee kleine wijzigingen aan de bediening en weergave rond Dagregistratie: het uitleg-i-knopje blijft bij openen op zijn plek, en aan de waterkant kun je met één tik het volgende duikerslot activeren.
