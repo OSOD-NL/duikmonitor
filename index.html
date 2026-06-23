@@ -576,7 +576,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.12.0";
+  const APP_VERSION = "v1.13.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -1180,7 +1180,7 @@
         dpl:"",
         veiligheidsregio:"",
         activiteitType:"oefening",
-        duiksysteem:"SCUBA",
+        duiksysteem:"SCUBA_OLV",
         dayNote:"",
         dayparts:{
           "1":{codes:["","",""]},
@@ -1189,10 +1189,10 @@
         groups:[],
         personnel:[]
       },
-      divers:Array.from({length:DIVER_SLOT_COUNT},(_,i)=>({id:defaultDiverCode(i), code:defaultDiverCode(i), label:"", active:true, defaultMdd:6, setNo:"", maskNo:""})),
+      divers:Array.from({length:DIVER_SLOT_COUNT},(_,i)=>({id:defaultDiverCode(i), code:defaultDiverCode(i), label:"", active:i < 4, defaultMdd:6, setNo:"", maskNo:""})),
       planning:[],
       live:[],
-      settings:{airSoundEnabled:false, theme:"auto"}  // theme: auto | night | day
+      settings:{airSoundEnabled:true, theme:"auto"}  // theme: auto | night | day
     };
   }
 
@@ -1269,7 +1269,7 @@
     state.project.veiligheidsregio = cleanVeiligheidsregio(state.project.veiligheidsregio || "");
     state.project.activiteitType = ["oefening","inzet","training","reintegratie","anders"].includes(state.project.activiteitType) ? state.project.activiteitType : "oefening";
     if(state.project.duiksysteem === "OLV") state.project.duiksysteem = "SCUBA_OLV";
-    state.project.duiksysteem = ["SCUBA","SCUBA_OLV","SSE","anders","onbekend"].includes(state.project.duiksysteem) ? state.project.duiksysteem : "SCUBA";
+    state.project.duiksysteem = ["SCUBA","SCUBA_OLV","SSE","anders","onbekend"].includes(state.project.duiksysteem) ? state.project.duiksysteem : "SCUBA_OLV";
     state.project.dayNote = cleanNote(state.project.dayNote || "");
     if(typeof state.project.scope !== "string") state.project.scope = cleanCode(state.project.scope || "");
     state.project.scope = cleanCode(state.project.scope || "");
@@ -2277,7 +2277,7 @@
         <div class="f2"><label>DPL</label><input aria-label="DPL" class="user${requiredClass(state.project.dpl)}" maxlength="8" value="${esc(state.project.dpl)}" data-project="dpl" data-required-project></div>
         <div class="f4"><label>Veiligheidsregio</label>${veiligheidsregioField()}</div>
         <div class="f3"><label>Activiteittype</label><select aria-label="Activiteittype" class="user" data-project="activiteitType">${["oefening","inzet","training","reintegratie","anders"].map(v=>`<option value="${v}" ${state.project.activiteitType===v?'selected':''}>${v}</option>`).join("")}</select></div>
-        <div class="f3"><label>Duiksysteem</label><select aria-label="Duiksysteem" class="user" data-project="duiksysteem">${["SCUBA","SCUBA_OLV","SSE","anders","onbekend"].map(v=>`<option value="${v}" ${state.project.duiksysteem===v?'selected':''}>${v}</option>`).join("")}</select></div>
+        <div class="f3"><label>Duiksysteem</label><select aria-label="Duiksysteem" class="user" data-project="duiksysteem">${["SCUBA_OLV","SCUBA","SSE","anders","onbekend"].map(v=>`<option value="${v}" ${state.project.duiksysteem===v?'selected':''}>${v}</option>`).join("")}</select></div>
       </div>
       <details class="fold"${open1}><summary>Oefencodes dagdeel 1</summary><div class="fold-body"><div class="fieldrow"><div class="f4">${codeSelect('1',0)}</div><div class="f4">${codeSelect('1',1)}</div><div class="f4">${codeSelect('1',2)}</div></div></div></details>
       <details class="fold"${open2}><summary>Oefencodes dagdeel 2</summary><div class="fold-body"><div class="fieldrow"><div class="f4">${codeSelect('2',0)}</div><div class="f4">${codeSelect('2',1)}</div><div class="f4">${codeSelect('2',2)}</div></div></div></details>
@@ -2558,15 +2558,15 @@
     return ensureAirFields({id:uid(), diverId, entryMode:"achteraf", registrationType:"normal", dtMode:"auto", dtUsedMin:"", phases:[], start:"", ascentStart:"", surface:"", mdd:cleanMddValue(div.defaultMdd,{clamp:true,fallback:6}), rule:"auto", daypart:"1", notes:"", signalHolder:"", setNo:div.setNo||"", maskNo:div.maskNo||""});
   }
   function latestActiveDive(diverId){ return [...state.live].reverse().find(d=>d.diverId===diverId && d.start && !d.surface); }
-  // Een afgesloten duik (boven gemeld) waarvan de einddruk nog niet is vastgelegd
-  // en die ook geen luchtmeting heeft om op terug te vallen. Dan moet de duiker
-  // de einddruk van het toestel nog noteren.
+  // Een afgesloten duik (boven gemeld) waarvan de einddruk nog niet is vastgelegd.
+  // De einddruk is per definitie de druk boven, aan het eind van de duik; een
+  // tussentijdse luchtmeting op diepte telt daar niet voor. Een afgesloten duik
+  // zonder vastgelegde airEndBar wacht dus altijd op einddruk, ook als er
+  // luchtmetingen zijn.
   function latestDiveAwaitingEndBar(diverId){
     const d = [...state.live].reverse().find(x=>x.diverId===diverId && x.start && x.surface);
     if(!d) return null;
     if(validBar(d.airEndBar) != null) return null;
-    const ms = airMeasurements(d);
-    if(ms.length) return null;
     return d;
   }
   function startLiveDiveFor(diverId, airStartBar){
@@ -2797,6 +2797,7 @@
     document.querySelectorAll("[data-start-bar]").forEach(inp=>{
       pendingStartBars[inp.dataset.startBar] = inp.value;
       inp.oninput = ()=>{ pendingStartBars[inp.dataset.startBar] = inp.value; };
+      inp.onchange = ()=>{ const before = inp.value; const cleaned = cleanBarValue(inp.value); if(String(cleaned) !== String(before).trim()){ if(before.trim() !== ""){ alert(`Drukwaarde buiten bereik of ongeldig. Vul een waarde in van 1 t/m ${MAX_BAR} bar.`); } } inp.value = cleaned === "" ? "" : cleaned; pendingStartBars[inp.dataset.startBar] = inp.value; };
     });
     document.querySelectorAll("[data-live-start]").forEach(btn=>btn.onclick=()=>{
       if(btn.disabled) return;
@@ -2807,12 +2808,13 @@
       mutate(()=>{ if(startLiveDiveFor(diverId, n)) delete pendingStartBars[diverId]; });
     });
     document.querySelectorAll("[data-live-ascent]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=latestActiveDive(btn.dataset.liveAscent); if(d && !d.ascentStart) stampField(d, "ascentStart", new Date()); }); });
-    document.querySelectorAll("[data-live-surface]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=latestActiveDive(btn.dataset.liveSurface); if(d){ const now=new Date(); stampField(d, "surface", now); ensureOsodIdentity(d); const a=airAnalysis(d); if(a.last) d.airEndBar = a.last.bar; } }); });
+    document.querySelectorAll("[data-live-surface]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=latestActiveDive(btn.dataset.liveSurface); if(d){ const now=new Date(); stampField(d, "surface", now); ensureOsodIdentity(d); } }); });
     document.querySelectorAll("[data-air-start]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.airStart); if(d){ ensureAirFields(d); d.airStartBar = cleanBarValue(inp.value); inp.value = d.airStartBar; } }));
-    document.querySelectorAll("[data-air-start-correct]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.airStartCorrect); if(d){ ensureAirFields(d); d.airStartBar = cleanBarValue(inp.value); inp.value = d.airStartBar; } }));
+    document.querySelectorAll("[data-air-start-correct]").forEach(inp=>inp.onchange=()=>{ const before = inp.value; const cleaned = cleanBarValue(inp.value); if(String(cleaned) !== String(before).trim() && before.trim() !== ""){ alert(`Drukwaarde buiten bereik of ongeldig. Vul een waarde in van 1 t/m ${MAX_BAR} bar.`); } mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.airStartCorrect); if(d){ ensureAirFields(d); d.airStartBar = cleaned; inp.value = d.airStartBar; } }); });
     document.querySelectorAll("[data-air-input]").forEach(inp=>{
       pendingAirInputs[inp.dataset.airInput] = inp.value;
       inp.oninput = ()=>{ pendingAirInputs[inp.dataset.airInput] = inp.value; };
+      inp.onchange = ()=>{ const before = inp.value; const cleaned = cleanBarValue(inp.value); if(String(cleaned) !== String(before).trim() && before.trim() !== ""){ alert(`Drukwaarde buiten bereik of ongeldig. Vul een waarde in van 1 t/m ${MAX_BAR} bar.`); } inp.value = cleaned === "" ? "" : cleaned; pendingAirInputs[inp.dataset.airInput] = inp.value; };
     });
     document.querySelectorAll("[data-air-depth-input]").forEach(inp=>{
       pendingAirDepthInputs[inp.dataset.airDepthInput] = inp.value;
@@ -2828,13 +2830,15 @@
       const n=validBar(inp?.value);
       if(n==null){ alert(`Vul een geldige druk in bar in (1-${MAX_BAR}).`); return; }
       const rawDepth = parseNum(depthInp?.value);
-      if(Number.isFinite(rawDepth) && rawDepth > MAX_MDD){ alert("Let op: gemeten diepte boven 15 m ligt buiten de rekenenvelop (no-deco tot 15 m). De meting wordt als feit geregistreerd; de DCIEM-berekening blokkeert voor deze duik."); }
+      if(!Number.isFinite(rawDepth)){ alert("Vul een geldige diepte in meters in."); depthInp?.focus(); return; }
+      if(rawDepth > MAX_MDD){ alert("Let op: gemeten diepte boven 15 m ligt buiten de rekenenvelop (no-deco tot 15 m). De meting wordt als feit geregistreerd; de DCIEM-berekening blokkeert voor deze duik."); }
       mutate(()=>{ const d=state.live.find(x=>x.id===id); if(d && addAirMeasurement(d,n,new Date(),depthInp?.value || "")){ delete pendingAirInputs[id]; delete pendingAirDepthInputs[id]; } });
     });
     document.querySelectorAll("[data-air-delete-last]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=state.live.find(x=>x.id===btn.dataset.airDeleteLast); if(d) deleteLastAirMeasurement(d); }); });
     document.querySelectorAll("[data-endbar-input]").forEach(inp=>{
       pendingEndBars[inp.dataset.endbarInput] = inp.value;
       inp.oninput = ()=>{ pendingEndBars[inp.dataset.endbarInput] = inp.value; };
+      inp.onchange = ()=>{ const before = inp.value; const cleaned = cleanBarValue(inp.value); if(String(cleaned) !== String(before).trim() && before.trim() !== ""){ alert(`Drukwaarde buiten bereik of ongeldig. Vul een waarde in van 1 t/m ${MAX_BAR} bar.`); } inp.value = cleaned === "" ? "" : cleaned; pendingEndBars[inp.dataset.endbarInput] = inp.value; };
     });
     document.querySelectorAll("[data-endbar-save]").forEach(btn=>btn.onclick=()=>{
       const id = btn.dataset.endbarSave;
@@ -3433,7 +3437,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.12.0", APP_VERSION, APP_VERSION==="v1.12.0");
+    push("basis","Appversielabel", "v1.13.0", APP_VERSION, APP_VERSION==="v1.13.0");
     // version.json-zelftest (B-0030): controleert dat het veld "version" in het bestand
     // version.json exact gelijk is aan APP_VERSION, zodat een niet-meegeschoven
     // version.json het zelftal laat zakken en niet stil kan misgaan. De vergeleken waarde
@@ -3484,7 +3488,7 @@
       try {
         // Groene stand: vinkje aanwezig, zichtbaar woord "geverifieerd" weg, aria-label
         // bevat het woord wel, telling en versie staan in de badge.
-        bootGate = { status:"green", passed:370, total:370, nonCritFail:0, critFail:0, failedCritical:[] };
+        bootGate = { status:"green", passed:389, total:389, nonCritFail:0, critFail:0, failedCritical:[] };
         updateVerifyBadge();
         const g = rendered(badgeEl);
         const ariaTag = 'aria-label="geverifieerd"';
@@ -3492,20 +3496,20 @@
         const groenGeenZichtbaarWoord = !gZonderAria.includes("geverifieerd");
         const groenVinkje = g.includes("\u2713");
         const groenAria = g.includes(ariaTag);
-        const groenTelling = g.includes("370/370");
+        const groenTelling = g.includes("389/389");
         const groenVersie = g.includes(APP_VERSION);
         const groenOk = groenGeenZichtbaarWoord && groenVinkje && groenAria && groenTelling && groenVersie;
         detail.push(`groen[vinkje=${groenVinkje} aria=${groenAria} telling=${groenTelling} versie=${groenVersie} geenWoord=${groenGeenZichtbaarWoord}]`);
         alleOk = alleOk && groenOk;
         // Oranje stand: tekst behouden.
-        bootGate = { status:"amber", passed:369, total:370, nonCritFail:1, critFail:0, failedCritical:[] };
+        bootGate = { status:"amber", passed:388, total:389, nonCritFail:1, critFail:0, failedCritical:[] };
         updateVerifyBadge();
         const a = rendered(badgeEl);
         const oranjeOk = a.includes("kern OK") && a.includes("niet-kritieke melding(en)");
         detail.push(`oranje[kernOK=${a.includes("kern OK")} melding=${a.includes("niet-kritieke melding(en)")}]`);
         alleOk = alleOk && oranjeOk;
         // Rode stand: tekst behouden.
-        bootGate = { status:"red", passed:0, total:370, nonCritFail:0, critFail:2, failedCritical:["x","y"] };
+        bootGate = { status:"red", passed:0, total:389, nonCritFail:0, critFail:2, failedCritical:["x","y"] };
         updateVerifyBadge();
         const r = rendered(badgeEl);
         const roodOk = r.includes("NIET GEVERIFIEERD") && r.includes("kritieke fout(en)");
@@ -3542,8 +3546,12 @@
       let alleOk = true;
       try{
         hideUpdateBar();
+        // De "nieuwer"-fixture wordt afgeleid van APP_VERSION (laatste onderdeel +1),
+        // zodat hij altijd strikt nieuwer is dan de huidige versie en de test
+        // meeschuift bij een versiebump zonder tautologisch te worden.
+        const nieuwerDanApp = (function(){ const p = parseVersionParts(APP_VERSION); p[p.length-1] = (p[p.length-1]||0) + 1; return "v" + p.join("."); })();
         // Nieuwere versie: melding verschijnt echt in de gerenderde balk.
-        const rNieuw = applyFetchedVersion("v1.12.1");
+        const rNieuw = applyFetchedVersion(nieuwerDanApp);
         const nieuwerToont = rNieuw === "nieuwer" && zichtbaar(barEl);
         detail.push(`nieuwer[status=${rNieuw} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && nieuwerToont;
@@ -3553,20 +3561,20 @@
         detail.push(`gelijk[status=${rGelijk} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && gelijkVerbergt;
         // Oudere versie: geen melding.
-        applyFetchedVersion("v1.12.1");
+        applyFetchedVersion(nieuwerDanApp);
         const rOud = applyFetchedVersion("v1.8.0");
         const ouderVerbergt = rOud === "nietNieuwer" && !zichtbaar(barEl);
         detail.push(`ouder[status=${rOud} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && ouderVerbergt;
         // Domme-string-grendel: een waarde buiten het versiepatroon toont niets, ook
         // niet na een staat waarin de melding zichtbaar was.
-        applyFetchedVersion("v1.12.1");
+        applyFetchedVersion(nieuwerDanApp);
         const rGieftig = applyFetchedVersion("<img src=x onerror=alert(1)>");
         const grendelWerkt = rGieftig === "ongeldig" && !zichtbaar(barEl);
         detail.push(`grendel[status=${rGieftig} zichtbaar=${zichtbaar(barEl)}]`);
         alleOk = alleOk && grendelWerkt;
         // Niet-versievormige numerieke onzin wordt ook geweigerd.
-        applyFetchedVersion("v1.12.1");
+        applyFetchedVersion(nieuwerDanApp);
         const rOnzin = applyFetchedVersion("1.10.1");
         const onzinGeweigerd = rOnzin === "ongeldig" && !zichtbaar(barEl);
         detail.push(`zondervee[status=${rOnzin} zichtbaar=${zichtbaar(barEl)}]`);
@@ -3589,7 +3597,7 @@
         // hetzelfde zouden doen, zou onderstaande gelijk zijn. De test eist juist dat
         // een nieuwere versie WEL en een ongeldige NIET toont; deze controle faalt
         // zodra de meldingslogica wegvalt of beide takken samenvallen.
-        applyFetchedVersion("v1.12.1");
+        applyFetchedVersion(nieuwerDanApp);
         const toontBijNieuw = zichtbaar(barEl);
         applyFetchedVersion("rommel");
         const toontBijRommel = zichtbaar(barEl);
@@ -3606,6 +3614,134 @@
         "nieuwer=zichtbaar; gelijk/ouder=verborgen; ongeldig=verborgen; tik=reload 1x",
         detail.join(" "),
         alleOk);
+    })();
+    // ===== v1.13.0 UI-interactietests (B-0024) =====
+    // Punt 1: einddruk wordt na Boven / einde altijd uitgevraagd; geen stille overname
+    // van de laatste luchtmeting. We starten een duik, voegen een luchtmeting toe,
+    // stempelen surface met dezelfde stampField-handeling als de knop, en controleren
+    // de GERENDERDE duikkaart: airEndBar blijft leeg en het einddruk-blokje is aanwezig.
+    (function(){
+      const uit = testState({live:[ensureAirFields({id:"p1ui",diverId:"D1",entryMode:"live",registrationType:"normal",dtMode:"auto",start:`${today}T09:00:00`,ascentStart:"",surface:"",mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:250,depth:9}]})]},()=>{
+        const d = state.live[0];
+        stampField(d, "surface", new Date(`${today}T09:12:00`));
+        const calc = calcDataset("live");
+        const html = renderLiveDiver(getDiver("D1"), calc);
+        return {
+          endLeeg: !(validBar(d.airEndBar) != null),
+          wacht: latestDiveAwaitingEndBar("D1") != null,
+          blokAanwezig: html.includes("Einddruk van het toestel noteren")
+        };
+      });
+      push("ui","Punt 1: na Boven / einde blijft einddruk leeg en het einddruk-blokje verschijnt (ook met luchtmeting)",
+        "leeg=ja, wacht=ja, blokje=ja", `leeg=${uit.endLeeg?'ja':'nee'}, wacht=${uit.wacht?'ja':'nee'}, blokje=${uit.blokAanwezig?'ja':'nee'}`,
+        uit.endLeeg===true && uit.wacht===true && uit.blokAanwezig===true);
+      // Negatieve controle: een afgesloten duik mét vastgelegde einddruk wacht NIET en
+      // toont het blokje niet. Zo faalt de test als de awaiting-logica of de stille
+      // overname terugkomt.
+      const neg = testState({live:[ensureAirFields({id:"p1neg",diverId:"D1",entryMode:"live",registrationType:"normal",dtMode:"auto",start:`${today}T09:00:00`,surface:`${today}T09:12:00`,mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300,airEndBar:120,airMeasurements:[{time:`${today}T09:05:00`,bar:250,depth:9}]})]},()=>{
+        const calc = calcDataset("live");
+        const html = renderLiveDiver(getDiver("D1"), calc);
+        return {wacht: latestDiveAwaitingEndBar("D1") != null, blokAanwezig: html.includes("Einddruk van het toestel noteren")};
+      });
+      push("ui","Punt 1 (negatieve controle): met vastgelegde einddruk geen wachtstatus en geen blokje",
+        "wacht=nee, blokje=nee", `wacht=${neg.wacht?'ja':'nee'}, blokje=${neg.blokAanwezig?'ja':'nee'}`,
+        neg.wacht===false && neg.blokAanwezig===false);
+    })();
+    // Punt 2: standaard vier duikers actief (D1 t/m D4), ook na Alles wissen.
+    (function(){
+      const schoon = defaultState();
+      const schoonActief = schoon.divers.filter(isDiverActive);
+      const naWis = testState({divers:[{id:"D1",code:"D1",label:"",active:false},{id:"D2",code:"D2",label:"",active:false}]},()=>{
+        resetAllData();
+        const act = state.divers.filter(isDiverActive);
+        return {aantal: act.length, codes: act.map(d=>d.code).join(",")};
+      });
+      push("ui","Punt 2: schone start heeft exact 4 actieve duikers D1 t/m D4",
+        "4 / D1,D2,D3,D4", `${schoonActief.length} / ${schoonActief.map(d=>d.code).join(",")}`,
+        schoonActief.length===4 && schoonActief.map(d=>d.code).join(",")==="D1,D2,D3,D4");
+      push("ui","Punt 2: na Alles wissen weer exact 4 actieve duikers D1 t/m D4",
+        "4 / D1,D2,D3,D4", `${naWis.aantal} / ${naWis.codes}`,
+        naWis.aantal===4 && naWis.codes==="D1,D2,D3,D4");
+      // Negatieve controle: niet 12 actief en niet D1 t/m D12. Zo faalt de test als de
+      // oude alles-actief-default terugkomt.
+      push("ui","Punt 2 (negatieve controle): niet alle twaalf duikers staan standaard actief",
+        "niet 12 actief", `${schoonActief.length} actief`, schoonActief.length!==12 && schoon.divers.length===12);
+    })();
+    // Punt 3: diepte verplicht bij het opslaan van een lucht-/dieptemeting. De opslaan-knop
+    // weigert een lege of niet-numerieke diepte (predicaat dat de handler gebruikt) en de
+    // handler is aangesloten met die diepte-eis; boven 15 m blijft een feit met blokkade.
+    (function(){
+      const wireSrc = typeof wireLiveButtons === "function" ? wireLiveButtons.toString() : "";
+      const dieptePredicaat = v => Number.isFinite(parseNum(v));
+      const leegGeweigerd = dieptePredicaat("") === false && dieptePredicaat("   ") === false;
+      const letterGeweigerd = dieptePredicaat("abc") === false;
+      const geldigGeaccepteerd = dieptePredicaat("8,5") === true && dieptePredicaat("9") === true;
+      const handlerEistDiepte = wireSrc.includes("Vul een geldige diepte in meters in");
+      // Een geldige meting wordt echt opgeslagen via de echte pijplijn.
+      const opslag = testState({live:[ensureAirFields({id:"p3ui",diverId:"D1",entryMode:"live",start:`${today}T09:00:00`,surface:"",mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300})]},()=>{
+        const d=state.live[0]; const ok=addAirMeasurement(d,250,new Date(`${today}T09:05:00`),9); return {ok, n:d.airMeasurements.length, depth:d.airMeasurements[0]?.depth};
+      });
+      push("ui","Punt 3: lege of niet-numerieke diepte wordt geweigerd, geldige diepte wordt opgeslagen, handler eist diepte",
+        "leeg=weiger, letter=weiger, geldig=ok, handler-eis=ja, opslag=ok",
+        `leeg=${leegGeweigerd?'weiger':'door'}, letter=${letterGeweigerd?'weiger':'door'}, geldig=${geldigGeaccepteerd?'ok':'nee'}, handler-eis=${handlerEistDiepte?'ja':'nee'}, opslag=${opslag.ok&&opslag.n===1?'ok':'nee'}`,
+        leegGeweigerd && letterGeweigerd && geldigGeaccepteerd && handlerEistDiepte && opslag.ok===true && opslag.n===1);
+      // Negatieve controle: het diepte-feit boven 15 m wordt NIET geklemd naar 15 (het
+      // feit blijft staan), zodat de strengere diepte-eis de bestaande boven-15m-keten
+      // niet wegpoetst.
+      const boven15 = testState({live:[ensureAirFields({id:"p3neg",diverId:"D1",entryMode:"achteraf",start:`${today}T09:00:00`,surface:`${today}T09:10:00`,mdd:14,daypart:"1",rule:"auto",notes:"",airStartBar:300})]},()=>{
+        const d=state.live[0]; addAirMeasurement(d,250,new Date(`${today}T09:05:00`),16.4); const u=calcDataset("live").units[0];
+        return {depth:d.airMeasurements[0]?.depth, mdd:d.mdd, blokkeert:(u?.severity??0)>=2 && (u?.codes||[]).includes("OUTSIDE_DEPTH_ENVELOPE")};
+      });
+      push("ui","Punt 3 (negatieve controle): diepte boven 15 m blijft als feit staan en wordt niet geklemd",
+        "16.4 bewaard, blokkeert", `${boven15.depth} bewaard, ${boven15.blokkeert?'blokkeert':'blokkeert niet'}`,
+        parseNum(boven15.depth)===16.4 && boven15.blokkeert===true);
+    })();
+    // Punt 5: getalsvelden zetten bij verlaten van het veld een waarde buiten bereik of een
+    // niet-numerieke waarde terug. cleanBarValue is de terugzet-regel die de blur-handler
+    // toepast; de drukvelden zijn aangesloten op een onchange die die regel gebruikt.
+    (function(){
+      const wireSrc = typeof wireLiveButtons === "function" ? wireLiveButtons.toString() : "";
+      const teHoogGeklemd = cleanBarValue("3000") === "";
+      const letterLeeg = cleanBarValue("abc") === "";
+      const geldigBlijft = cleanBarValue("300") === 300;
+      const randGeldig = cleanBarValue("330") === 330 && cleanBarValue("331") === "";
+      // Alle drie de pending-drukvelden plus het correctieveld hebben een onchange-terugzet.
+      const startWired = wireSrc.includes('"[data-start-bar]"') && /data-start-bar[\s\S]*?onchange/.test(wireSrc);
+      const airWired = wireSrc.includes('"[data-air-input]"') && /data-air-input[\s\S]*?onchange/.test(wireSrc);
+      const endWired = wireSrc.includes('"[data-endbar-input]"') && /data-endbar-input[\s\S]*?onchange/.test(wireSrc);
+      push("ui","Punt 5: drukveld zet te hoge of niet-numerieke waarde terug bij blur; velden zijn aangesloten",
+        "3000->leeg, abc->leeg, 300->300, 331->leeg, velden aangesloten",
+        `3000->${teHoogGeklemd?'leeg':'blijft'}, abc->${letterLeeg?'leeg':'blijft'}, 300->${geldigBlijft?'300':'anders'}, 331->${cleanBarValue("331")===""?'leeg':'blijft'}, aangesloten=${startWired&&airWired&&endWired?'ja':'nee'}`,
+        teHoogGeklemd && letterLeeg && geldigBlijft && randGeldig && startWired && airWired && endWired);
+      // Negatieve controle: een geldige waarde binnen bereik wordt NIET teruggezet.
+      push("ui","Punt 5 (negatieve controle): geldige drukwaarde binnen bereik blijft staan",
+        "120 blijft 120", `${cleanBarValue("120")}`, cleanBarValue("120")===120);
+    })();
+    // Punt 7: Alles wissen wist alleen bij exact overgetypte bevestiging WIS. attemptReset
+    // is de controleerbare grendel: alleen bij een exacte match wordt resetAllData
+    // uitgevoerd. We tonen dat een juiste invoer wist en een verkeerde of lege invoer de
+    // state intact laat, zonder een echte browser-prompt nodig te hebben.
+    (function(){
+      const juist = testState({project:{location:"Behoud-test"}, divers:[{id:"D1",code:"D1",label:"X",active:true},{id:"D2",code:"D2",label:"Y",active:true}]},()=>{
+        const gewist = attemptReset("WIS");
+        return {gewist, locatie: state.project.location, label: getDiver("D1").label};
+      });
+      const fout = testState({project:{location:"Behoud-test"}, divers:[{id:"D1",code:"D1",label:"X",active:true}]},()=>{
+        const gewist = attemptReset("wis");
+        return {gewist, locatie: state.project.location, label: getDiver("D1").label};
+      });
+      const leeg = testState({project:{location:"Behoud-test"}, divers:[{id:"D1",code:"D1",label:"X",active:true}]},()=>{
+        const gewist = attemptReset("");
+        return {gewist, locatie: state.project.location};
+      });
+      push("ui","Punt 7: Alles wissen wist alleen bij exact overgetypte WIS",
+        "WIS=wist, wis=behoudt, leeg=behoudt",
+        `WIS=${juist.gewist?'wist':'behoudt'} (loc ${juist.locatie==="" || juist.locatie==null ? 'leeg' : 'staat'}), wis=${fout.gewist?'wist':'behoudt'} (loc ${fout.locatie}), leeg=${leeg.gewist?'wist':'behoudt'}`,
+        juist.gewist===true && (juist.locatie===""||juist.locatie==null) && fout.gewist===false && fout.locatie==="Behoud-test" && fout.label==="X" && leeg.gewist===false && leeg.locatie==="Behoud-test");
+      // Negatieve controle: de grendelfunctie zelf accepteert alleen exact WIS.
+      push("ui","Punt 7 (negatieve controle): bevestigingsgrendel accepteert alleen exact WIS",
+        "WIS=ok; wis/leeg/spatie=nee", `WIS=${resetConfirmPhraseOk("WIS")?'ok':'nee'}; wis=${resetConfirmPhraseOk("wis")?'ok':'nee'}; leeg=${resetConfirmPhraseOk("")?'ok':'nee'}; spatie=${resetConfirmPhraseOk(" WIS ")?'ok':'nee'}`,
+        resetConfirmPhraseOk("WIS")===true && resetConfirmPhraseOk("wis")===false && resetConfirmPhraseOk("")===false && resetConfirmPhraseOk(" WIS ")===true);
     })();
     // UI-interactietest (B-0024-geest): de updatemelding #updateBar staat als in-flow
     // strook (installbar-stijl) BOVEN de installatiestrook, niet als zwevende pil. We
@@ -3814,7 +3950,8 @@
     push("basis","Standaard MDD na reset", "6 m", defaultState().divers[0].defaultMdd + " m", defaultState().divers.every(d=>d.defaultMdd===6));
     push("basis","D1 t/m D12 beschikbaar", "12 duikers", defaultState().divers.length + " duikers", defaultState().divers.length===12);
     push("basis","Standaardcodes D1 t/m D12", "D1 … D12", defaultState().divers[0].code + " … " + defaultState().divers[11].code, defaultState().divers[0].code==="D1" && defaultState().divers[11].code==="D12");
-    push("basis","Standaardduikers zijn actief", "12 actief", String(defaultState().divers.filter(isDiverActive).length), defaultState().divers.filter(isDiverActive).length===12);
+    push("basis","Standaard vier duikers actief", "4 actief", String(defaultState().divers.filter(isDiverActive).length), defaultState().divers.filter(isDiverActive).length===4);
+    push("basis","Standaard actieve duikers zijn D1 t/m D4", "D1,D2,D3,D4", defaultState().divers.filter(isDiverActive).map(d=>d.code).join(","), defaultState().divers.filter(isDiverActive).map(d=>d.code).join(",")==="D1,D2,D3,D4");
     const fixedMigration = testState({divers:[{id:"D1",code:"K01",label:"",active:false,defaultMdd:9},{id:"D2",code:"D02",label:"",defaultMdd:6}]},()=>({d1:displayDiver("D1"), d1Code:getDiver("D1").code, d1Active:isDiverActive(getDiver("D1")), d2Code:getDiver("D2").code, count:state.divers.length}));
     push("basis","Duikers migreren naar vaste D1-D12 zonder hernummeren", "D1 · K01 / D2 / 12", `${fixedMigration.d1} / ${fixedMigration.d2Code} / ${fixedMigration.count}`, fixedMigration.d1==="D1 · K01" && fixedMigration.d1Code==="D1" && fixedMigration.d1Active===false && fixedMigration.d2Code==="D2" && fixedMigration.count===12);
     const inactiveOptions = testState({divers:[{id:"D1",code:"D1",active:true,label:""},{id:"D2",code:"D2",active:false,label:""}]},()=>({blank:diverOptions(""), selected:diverOptions("D2"), start:startLiveDiveFor("D2",300), visible:visibleDiversForDataset("live").map(d=>d.id).join("/")}));
@@ -3915,7 +4052,7 @@
     const hdr5 = checkHeadersForRecords([{drukcheck:5, checkPoints:[{elapsed:18}]}]);
     push("registratie","Drukcheck (stap 5) tot 18 min loopt t/m 20", "5,10,15,20", hdr5.join(","), hdr5.join(",")==="5,10,15,20");
     const soundDefault = defaultState().settings.airSoundEnabled;
-    push("lucht","Drukcheck-geluid staat standaard uit", "uit", soundDefault ? "aan" : "uit", soundDefault === false);
+    push("lucht","Drukcheck-geluid staat standaard aan", "aan", soundDefault ? "aan" : "uit", soundDefault === true);
     // Thema-logica.
     push("thema","Thema staat standaard op auto", "auto", defaultState().settings.theme, defaultState().settings.theme==="auto");
     const midJune = new Date(2026,5,15,13,0,0);  // juni, 13:00 -> dag
@@ -4767,6 +4904,20 @@
     try{ [STORAGE_KEY,...LEGACY_STORAGE_KEYS].forEach(k=>localStorage.removeItem(k)); }catch(e){ console.warn(e); }
     state = defaultState();
   }
+  // Zwaardere bevestiging voor de onomkeerbare wis-actie: de gebruiker moet het woord
+  // WIS exact overtypen. resetConfirmPhraseOk is de controleerbare grendel; attemptReset
+  // voert de wis alleen uit bij een exacte match en geeft terug of er gewist is. De
+  // gebruikersinvoer komt in de browser uit een prompt; de grendel zelf leunt niet op
+  // een prompt, zodat de zelftest hem aantoonbaar kan toetsen.
+  const RESET_CONFIRM_PHRASE = "WIS";
+  function resetConfirmPhraseOk(input){
+    return String(input == null ? "" : input).trim() === RESET_CONFIRM_PHRASE;
+  }
+  function attemptReset(phrase){
+    if(!resetConfirmPhraseOk(phrase)) return false;
+    mutate(resetAllData);
+    return true;
+  }
   function exampleDiveTimes(base, h, m, bottomMin, ascentSec){
     const startStr = `${base}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`;
     const ascentDate = new Date(startStr); ascentDate.setMinutes(ascentDate.getMinutes()+bottomMin);
@@ -5302,7 +5453,7 @@
     document.getElementById("settingsScreen").innerHTML = `<div class="grid">
       <div class="card span12"><div class="headline"><h2>Instellingen</h2><details class="info no-print"><summary title="Uitleg Instellingen" aria-label="Uitleg Instellingen">i</summary><div class="info-body">Gebruik bij voorkeur vaste duikercodes en neutrale aanduidingen. Vrije aanduidingen, DPL en notities kunnen persoonsgegevens bevatten; deel die niet via GitHub of voorbeeldbestanden. Beheer en controle staan bovenaan; daaronder staan de standaard duikcodes en materiaalgegevens. Het schermthema (Nacht of Dag) staat rechtsboven in de balk. Nacht is donker voor bus en duisternis; Dag is licht met hoog contrast voor zon en waterkant. Bij openen kiest de app zelf op basis van de klok tussen nacht en dag; een eigen keuze blijft daarna staan. De knop Auto hieronder zet dat terug naar automatisch.</div></details></div><details class="fold no-print"><summary>Beheer en controle</summary><div class="fold-body"><div class="btnrow"><button class="bad" id="resetAll">Alles wissen</button><button class="primary" id="settingsSelftest">Zelftest openen</button></div><div class="soundbox compact"><div class="fieldrow"><div class="f4"><label>Drukcheck-geluid</label><select aria-label="Drukcheck-geluid" class="user" id="airSoundEnabled"><option value="off" ${state.settings?.airSoundEnabled?'':'selected'}>Uit</option><option value="on" ${state.settings?.airSoundEnabled?'selected':''}>Aan</option></select></div><div class="f4"><label>&nbsp;</label><button class="mini ghost" id="testAirSound">Test piep</button></div><div class="f4"><label>Schermthema</label><button class="mini ghost" id="themeAuto" title="Zet thema terug op automatisch (klok)">Auto (klok)</button></div></div></div></div></details></div>
       <div class="card span12"><details class="fold"><summary aria-label="Over deze tool openen of sluiten">Over deze tool</summary><div class="fold-body"><p class="note">De Duikmonitor is een praktisch hulpmiddel voor aan de waterkant. Veel kun je vooraf regelen: plannen, opschrijven, oefenen. Tijdens een echte inzet gaat de registratie echter vaak nog met de hand. Deze app is bedoeld om te laten zien dat het ook eenvoudiger kan: een paar knoppen, en de duik staat geregistreerd, met de berekeningen en regels er al in.</p><p class="note">Het is een open voorbeeld, geen eindantwoord. De app is open source. Probeer hem uit, kijk of de berekeningen kloppen, en geef aan wat beter kan. Zie je iets, dan kijken we samen. Gebruik hem voor jezelf, pas hem aan voor je eigen regio, of bouw mee. Het gaat niet om deze app, maar om of het beter en veiliger kan.</p><div class="hint">De tabellen en regels horen voor operationeel gebruik door het juiste gezag bevestigd te worden.</div></div></details></div><div class="card span12"><details class="fold"><summary aria-label="Over de OSOD-standaard openen of sluiten">Over de OSOD-standaard</summary><div class="fold-body"><p class="note">OSOD is de Open Standaard Operationele Duikregistratie (versie ${OSOD_VERSION}). Deze app is de referentie-implementatie ervan en volgt de rekenregels en het record-formaat van die standaard. De app conformeert zich aan de standaard, niet andersom.</p><p class="note">De standaard zelf is openbaar. Je kunt hem inzien en meelezen via de OSOD-repository.</p><div class="btnrow"><a class="buttonlink ghost" href="${OSOD_REPO_URL}" target="_blank" rel="noopener noreferrer">OSOD-standaard openen</a></div></div></details></div><div class="card span12 no-print"><div class="headline"><h3>Meedenken en melden</h3><details class="info no-print"><summary title="Uitleg Meedenken" aria-label="Uitleg Meedenken">i</summary><div class="info-body">Gebruik GitHub voor reproduceerbare fouten en concrete verbeterideeën. Zet daar geen echte namen, telefoonnummers, e-mailadressen, locaties of operationele persoonsgegevens in. Gebruik fictieve voorbeelden zoals Duiker 1.</div></details></div><p class="note">De publieke app staat op duikmonitor.nl. De broncode, documentatie en meldroute staan op GitHub.</p><div class="btnrow"><a class="buttonlink primary" href="${PUBLIC_APP_URL}" target="_blank" rel="noopener noreferrer">Website openen</a><a class="buttonlink ghost" href="${REPO_URL}" target="_blank" rel="noopener noreferrer">Broncode bekijken</a><a class="buttonlink ghost" href="${ISSUE_URL}" target="_blank" rel="noopener noreferrer">Probleem of idee melden</a><a class="buttonlink ghost" href="${SECURITY_URL}" target="_blank" rel="noopener noreferrer">Security-route</a></div><div class="hint">Meld beveiligingsproblemen niet openbaar in Issues. Deel exports alleen bewust; de app bewaart gegevens lokaal in deze browser.</div></div>
-      <div class="card span12"><div class="headline"><h3>Duikers</h3><details class="info no-print"><summary title="Uitleg Duikers" aria-label="Uitleg Duikers">i</summary><div class="info-body">Na Alles wissen staat de monitor weer schoon met vaste duikers D1 t/m D12 en MDD 6 m. Vink Actief uit om een duikerslot tijdelijk uit planning, live bediening en overzichten te halen. Duiker is de vaste code; Aanduiding is vrij en optioneel. Seinhouder is de seinhouder voor deze duiker; de duikploegleider staat bij de daggegevens. Set # en Masker # worden bij Start duik gekopieerd naar de duikregistratie.</div></details></div><div class="btnrow no-print"><button class="ghost" id="depthAllToggle" title="Zet de standaard-MDD van alle duikers in één keer">Diepte voor allen…</button><span id="depthAllPanel" style="display:none;align-items:center;gap:6px"><input aria-label="Standaard-MDD voor alle duikers" class="user" type="number" inputmode="numeric" step="1" min="0" max="15" id="depthAllValue" placeholder="m" style="max-width:80px"><button class="primary mini" id="depthAllApply">Toepassen</button></span></div><div class="tablewrap"><table class="table"><thead><tr><th>Actief</th><th>Duiker</th><th>Aanduiding</th><th>Seinhouder</th><th>MDD</th><th>Set #</th><th>Masker #</th></tr></thead><tbody>${state.divers.map(d=>`<tr><td><input type="checkbox" data-diver-active="${esc(d.id)}" ${isDiverActive(d)?'checked':''} aria-label="${esc(diverCode(d))} actief"></td><td class="mono"><strong>${esc(diverCode(d))}</strong></td><td><input aria-label="Aanduiding ${esc(diverCode(d))}" class="user" data-diver-label="${esc(d.id)}" maxlength="8" value="${esc(cleanDiverLabel(d.label))}" placeholder="bijv. K01, INS1"></td><td><input aria-label="Seinhouder ${esc(diverCode(d))}" class="user" maxlength="8" data-diver-sh="${esc(d.id)}" value="${esc(d.sh||'')}" placeholder="-"></td><td><input aria-label="MDD ${esc(diverCode(d))}" class="user" type="text" inputmode="decimal" data-diver-mdd="${esc(d.id)}" value="${esc(d.defaultMdd||6)}"></td><td><input aria-label="Set ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-set="${esc(d.id)}" value="${esc(d.setNo||'')}" placeholder="-"></td><td><input aria-label="Masker ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-mask="${esc(d.id)}" value="${esc(d.maskNo||'')}" placeholder="-"></td></tr>`).join("")}</tbody></table></div><p class="small muted">D1 t/m D12 zijn vaste duikercodes en worden niet automatisch hernummerd. Gebruik Aanduiding alleen voor een rol of neutrale herkenning. Gebruik geen echte namen als je exports of voorbeelden deelt.</p></div>
+      <div class="card span12"><div class="headline"><h3>Duikers</h3><details class="info no-print"><summary title="Uitleg Duikers" aria-label="Uitleg Duikers">i</summary><div class="info-body">Na Alles wissen staat de monitor weer schoon met vaste duikers D1 t/m D12, waarvan de eerste vier (D1 t/m D4) standaard actief zijn; de overige zet je met het vinkje Actief aan. MDD staat dan op 6 m. Vink Actief uit om een duikerslot tijdelijk uit planning, live bediening en overzichten te halen. Duiker is de vaste code; Aanduiding is vrij en optioneel. Seinhouder is de seinhouder voor deze duiker; de duikploegleider staat bij de daggegevens. Set # en Masker # worden bij Start duik gekopieerd naar de duikregistratie.</div></details></div><div class="btnrow no-print"><button class="ghost" id="depthAllToggle" title="Zet de standaard-MDD van alle duikers in één keer">Diepte voor allen…</button><span id="depthAllPanel" style="display:none;align-items:center;gap:6px"><input aria-label="Standaard-MDD voor alle duikers" class="user" type="number" inputmode="numeric" step="1" min="0" max="15" id="depthAllValue" placeholder="m" style="max-width:80px"><button class="primary mini" id="depthAllApply">Toepassen</button></span></div><div class="tablewrap"><table class="table"><thead><tr><th>Actief</th><th>Duiker</th><th>Aanduiding</th><th>Seinhouder</th><th>MDD</th><th>Set #</th><th>Masker #</th></tr></thead><tbody>${state.divers.map(d=>`<tr><td><input type="checkbox" data-diver-active="${esc(d.id)}" ${isDiverActive(d)?'checked':''} aria-label="${esc(diverCode(d))} actief"></td><td class="mono"><strong>${esc(diverCode(d))}</strong></td><td><input aria-label="Aanduiding ${esc(diverCode(d))}" class="user" data-diver-label="${esc(d.id)}" maxlength="8" value="${esc(cleanDiverLabel(d.label))}" placeholder="-"></td><td><input aria-label="Seinhouder ${esc(diverCode(d))}" class="user" maxlength="8" data-diver-sh="${esc(d.id)}" value="${esc(d.sh||'')}" placeholder="-"></td><td><input aria-label="MDD ${esc(diverCode(d))}" class="user" type="text" inputmode="decimal" data-diver-mdd="${esc(d.id)}" value="${esc(d.defaultMdd||6)}"></td><td><input aria-label="Set ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-set="${esc(d.id)}" value="${esc(d.setNo||'')}" placeholder="-"></td><td><input aria-label="Masker ${esc(diverCode(d))}" class="user" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" data-diver-mask="${esc(d.id)}" value="${esc(d.maskNo||'')}" placeholder="-"></td></tr>`).join("")}</tbody></table></div><p class="small muted">D1 t/m D12 zijn vaste duikercodes en worden niet automatisch hernummerd. Gebruik Aanduiding alleen voor een rol of neutrale herkenning. Gebruik geen echte namen als je exports of voorbeelden deelt.</p></div>
       <div class="card span12"><details class="fold" data-expand-all-details="true"><summary>Rekenregels</summary><div class="fold-body"><div class="warnbox"><b>Hulpmiddel.</b> Deze app ondersteunt planning, controle en registratie. De app vervangt geen formele werkinstructie, papieren tabel, duikcomputer, duikploegleider, LMRA, werkplan, medisch advies of regionaal beleid.</div><div class="hint"><b>Bron DCIEM-tabellen:</b> IWOD 002 Decompressiemethoden (1 april 2019) § 2300 luchttabel 1.</div><div class="hint" style="margin-top:8px"><b>HF voor groep B bij OI 2:00-2:59:</b> de monitor gebruikt 1,2. Dat is de waarde van de canonieke DCIEM-bron, bevestigd door de IWOD 002 (2019) en het DCIEM-origineel (1992). De Landelijke Werkinstructie WOD v2.0 vermeldt op deze ene cel 1,1. Dit is een gedocumenteerd bronconflict; de monitor volgt de bronwaarde 1,2. Terzijde: 1,2 is ook de strengere van de twee, want een hogere HF geeft een langere EDT, dus de monitor staat hiermee aan de veilige kant.</div><div class="fieldrow" style="margin-top:12px"><div class="f6"><h3>Controle en verificatie</h3><p class="note">De berekeningen zijn controleerbaar via de broncode in de repository, vaste testgevallen en de ingebouwde zelftest. Gebruik de zelftest om de rekenregels op dit toestel opnieuw te controleren.</p><div class="hint">Bij een release horen appversie, bronprofiel en controlegetal, zodat later duidelijk is welke versie is gebruikt.</div></div><div class="f6"><h3>Kernregels ingebouwd</h3><ul class="messages"><li>No-deco tot maximaal 15 m.</li><li>MDD wordt afgerond naar tabeldiepte 6/9/12/15 m.</li><li>Airtabel 1 bepaalt HG.</li><li>Tabel 4a bepaalt HF op basis van HG en OI.</li><li>Tabel 4b bepaalt herhalings-NDL.</li><li>EDT = DT × HF, conservatief afgerond naar boven.</li><li>6-, 9- en 12-meterregel wordt alleen als toegepast getoond wanneer duikmomenten van dezelfde duiker worden opgeteld.</li><li>Dagdeel 1 en Dagdeel 2 worden gescheiden berekend.</li></ul></div><div class="f6"><h3>Dagdeel en meterregel</h3><p class="note">Bij een losse duik toont de monitor Tabel 1 met de juiste tabeldiepte. Pas wanneer duikmomenten van dezelfde duiker binnen hetzelfde dagdeel worden samengenomen, toont de monitor 6-, 9- of 12-meterregel toegepast; daarbij gebruikt de monitor de hoogste MDD en telt hij de duiktijden op voor één HG.</p><div class="hint">Eén losse duik t/m 6/9/12 m = Tabel 1 met tabeldiepte 6/9/12 m. Meerdere duikmomenten van dezelfde duiker die worden opgeteld = 6-/9-/12-meterregel toegepast. Duiken van verschillende duikers worden nooit samengevoegd.</div><div class="hint" style="margin-top:8px"><b>Periodebewaking:</b> als duikmomenten over twee dagdelen vallen zonder rustpauze van minimaal 1 uur ertussen, telt de monitor de duiktijden alsnog op tijdsbasis op en waarschuwt bij overschrijding van de meterregellimiet. Controleer dan of het operationeel echt om twee dagdelen gaat.</div></div><div class="f6"><h3>Dieper dan 12 m</h3><p class="note">De monitor geeft nu een aparte procedurehint bij geplande en niet-geplande situaties boven 12 m.</p><div class="hint">${esc(over12PlannedGuidance)}</div><div class="warnbox" style="margin-top:10px"><b>Niet-geplande overschrijding, alleen als ook de 3-duikenlimiet is overschreden:</b> ${esc(over12UnplannedProcedure)}</div></div><div class="f12"><h3>Opstijgingen en rust</h3><p class="note">Opstijgingen worden per duiker bewaakt per duikperiode van 4 uur en per duikdag. Tussen twee opstijgingen geldt minimaal 15 minuten oppervlakte-interval. Na een duikperiode van 4 uur geldt minimaal 1 uur rust.</p><div class="tablewrap"><table class="table"><thead><tr><th>Maximale diepte</th><th>Per 4 uur</th><th>Per dag</th><th>Bronlaag</th></tr></thead><tbody><tr><td>t/m 6 m</td><td>6</td><td>12</td><td>DMC-advies 2013</td></tr><tr><td>&gt;6 t/m 9 m</td><td>4</td><td>8</td><td>DMC-advies 2013</td></tr><tr><td>&gt;9 t/m 12 m</td><td>3</td><td>6</td><td>Conservatieve projectregel</td></tr><tr><td>&gt;12 t/m 15 m</td><td>3</td><td>3</td><td>WOD-regime / projectmatige borging</td></tr></tbody></table></div><div class="hint" style="margin-top:10px"><b>Waarom extra?</b> De meterregel vereenvoudigt DCIEM-planning voor meerdere ondiepe duikmomenten. Die vereenvoudiging is geen toestemming voor onbeperkt herhaald opstijgen; daarom bewaakt de monitor ook de opstijgingsaantallen.</div><p class="small muted">DMC noemt 6 m en 9 m expliciet. De diepere categorieën zijn conservatief/projectmatig geborgd; de meest beperkende grens is leidend.</p></div><div class="f6"><h3>Opkomstvenster</h3><p class="note">Gebaseerd op 18 ± 3 meter per minuut. Live-metingen worden op seconden gecontroleerd.</p><div class="hint">Te snel, niet geregistreerd of afwijkend opkomen geeft een controlehint in de hoofdstatus.</div></div><div class="f6"><h3>Ademluchtbewaking</h3><p class="note">Actieve duiken kunnen tussentijds luchtmetingen vastleggen. De monitor gebruikt standaard 2×4 L, rekent resterende tijd tot 100 bar en kiest automatisch het juiste drukcheck-interval.</p><div class="hint">Ademluchtbewaking is een operationele controlelaag, geen DCIEM-tabelbron.</div></div><div class="f12"><h3>Privacy en lokaal gebruik</h3><p class="note">De monitor rekent in de browser op dit apparaat. Ingevoerde gegevens worden niet automatisch naar een server verzonden.</p><p class="note">Er is geen account, geen centrale database en geen automatische synchronisatie. Gegevens blijven lokaal in de browser, tenzij de gebruiker ze zelf exporteert, print, kopieert of deelt.</p><div class="hint">De appbestanden kunnen via duikmonitor.nl of als lokaal bestand worden geopend. Ingevulde duikgegevens en berekeningen worden door de app niet naar GitHub, de beheerder of een eigen server verzonden. Bij het openen van een openbare website kan de hostinglaag wel normale technische requestgegevens ontvangen; dat staat los van de lokale appdata.</div></div></div></div></details></div>
       <div class="card span12"><details class="fold"><summary>Voorbeelden laden</summary><div class="fold-body"><div class="headline"><h3>Voorbeeld laden</h3><details class="info no-print"><summary title="Uitleg Voorbeelden" aria-label="Uitleg Voorbeelden">i</summary><div class="info-body">Voorbeelden zijn fictieve demo-gegevens met alleen codes. Ze zijn bedoeld om de app, meldingen, registratie en export te bekijken. Laden vervangt de huidige gegevens. De zelftest is iets anders: die controleert automatisch de rekenregels met vaste verwachte uitkomsten en schrijft niets weg in je echte planning of dagregistratie.</div></details></div><div class="fieldrow">
         ${v118ExampleCard(1,"Gecombineerde duiken","RD/ResD en gecombineerde duiken met meerdere combinaties.")}
@@ -5327,7 +5478,11 @@
     if(depthApply){ depthApply.onclick=()=>{ let v=parseNum(depthValue?.value); if(v==null||v<=0){ alert("Vul een diepte in meters in."); depthValue?.focus(); return; } if(v>MAX_MDD){ v=MAX_MDD; alert("Maximale duikdiepte is 15 m. De waarde is teruggezet naar 15."); } if(!confirm(`Standaard-MDD van alle duikers op ${v} m zetten?`)) return; mutate(()=>{ state.divers.forEach(d=>d.defaultMdd=v); }); }; }
     document.querySelectorAll("[data-diver-set]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverSet); if(d)d.setNo=cleanMaterial(inp.value);}));
     document.querySelectorAll("[data-diver-mask]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverMask); if(d)d.maskNo=cleanMaterial(inp.value);}));
-    document.getElementById("resetAll").onclick=()=>{ if(confirm("Alle lokale gegevens wissen en terug naar standaard codes D1 t/m D12 en MDD 6 m?")) mutate(resetAllData); };
+    document.getElementById("resetAll").onclick=()=>{
+      if(!confirm("Let op: hiermee wis je alle lokale gegevens en gaat de app terug naar de standaard. Dit kan niet ongedaan worden gemaakt. Doorgaan?")) return;
+      const phrase = (typeof prompt === "function") ? prompt("Typ het woord WIS om het wissen te bevestigen.") : null;
+      if(!attemptReset(phrase)){ if(phrase != null) alert("Niet gewist: de bevestiging kwam niet overeen. Typ exact WIS om te wissen."); }
+    };
     const airSoundSelect = document.getElementById("airSoundEnabled");
     if(airSoundSelect) airSoundSelect.onchange = async e=>{
       state.settings.airSoundEnabled = e.target.value === "on";
