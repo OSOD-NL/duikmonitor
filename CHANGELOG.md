@@ -2,6 +2,25 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.14.0] - 2026-06-23
+
+Twee kleine wijzigingen aan de bediening en weergave rond Dagregistratie: het uitleg-i-knopje blijft bij openen op zijn plek, en aan de waterkant kun je met één tik het volgende duikerslot activeren.
+
+### Toegevoegd
+
+- Een knop "+ Duiker erbij" op de Dagregistratie, onder de rij duikerkaarten, die het eerstvolgende nog inactieve duikerslot activeert (de duiker met de laagste code die niet actief is). De knop voegt alleen toe; hij haalt nooit een duiker weg. Zijn alle twaalf sloten actief, dan is de knop uitgeschakeld. Daarvoor moest je eerder naar Instellingen om een slot aan te vinken.
+- Twee zelftests die de bediening echt nadoen en de uitkomst controleren: dat het uitleg-i-knopje bij openen niet meeverhuist (de opengeklapte uitleg loopt uit de flexrij), en dat "+ Duiker erbij" precies één extra slot activeert, het eerstvolgende, tot maximaal twaalf, zonder ooit een duiker inactief te maken of een nieuw slot aan te maken. Beide zelftests hebben een tegencontrole.
+
+### Gewijzigd
+
+- De plaatsing van de uitleg-i is aangepast zodat het ronde i-knopje bij openen op zijn vaste plek rechts naast de titel blijft. Voorheen brak de titelrij af bij openen en verhuisde het knopje mee naar een nieuwe regel. De opengeklapte uitleg verschijnt nu onder de titelregel over de breedte van de kaart. Dit is een zuivere opmaakwijziging; het openen en sluiten van de uitleg en de visuele stijl van knopje en tekstblok blijven gelijk. De wijziging geldt app-breed voor alle uitleg-i-knopjes.
+- Appversielabel verhoogd naar v1.14.0; de bijbehorende zelftest controleert mee op v1.14.0. version.json bijgewerkt naar v1.14.0.
+- Het opstart-zelftal gaat van 389 naar 391 door de twee nieuwe zelftests met hun tegencontroles.
+
+### Niet gewijzigd
+
+- Rekenkern, tabelwaarden, rekenbronfingerprint, blokkeerlogica, statussemantiek, validatie en schema zijn niet aangeraakt. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd. Het gedrag van de updatecontrole en de in v1.12.0 vastgelegde plaatsing van de versiemelding blijven gelijk. De begintoestand (D1 t/m D4 standaard actief) en het aantal duikersloten (twaalf) blijven ongewijzigd; de knop verandert alleen de live-toestand op gebruikersactie. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.13.0] - 2026-06-23
 
 Een ronde verbeteringen aan invoer en standaardwaarden: de einddruk wordt na een duik altijd uitgevraagd, de monitor start schoner op, en getalsvelden vangen ongeldige invoer beter op.
