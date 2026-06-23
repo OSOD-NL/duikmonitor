@@ -2,6 +2,31 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.13.0] - 2026-06-23
+
+Een ronde verbeteringen aan invoer en standaardwaarden: de einddruk wordt na een duik altijd uitgevraagd, de monitor start schoner op, en getalsvelden vangen ongeldige invoer beter op.
+
+### Toegevoegd
+
+- Vijf zelftests die de bediening echt nadoen en de uitkomst op het scherm controleren: dat de einddruk na Boven / einde wordt uitgevraagd, dat een schone start vier actieve duikers heeft, dat een lucht-/dieptemeting een diepte vereist, dat drukvelden een ongeldige waarde terugzetten, en dat Alles wissen alleen wist na een uitdrukkelijke bevestiging. Elke zelftest heeft een tegencontrole.
+
+### Gewijzigd
+
+- Na Boven / einde vraagt de monitor de einddruk van het toestel nu altijd uit. Voorheen kon een eerder ingevoerde luchtmeting stil als einddruk worden overgenomen; dat gebeurt niet meer, zodat de afgelezen einddruk van het toestel bewust wordt vastgelegd.
+- Een schone monitor start met de eerste vier duikers (D1 t/m D4) actief in plaats van alle twaalf. De overige duikers zet je met het vinkje Actief aan wanneer je ze nodig hebt.
+- Bij het opslaan van een lucht-/dieptemeting is de diepte nu verplicht. Een lege of niet-numerieke diepte wordt geweigerd met een korte melding. Een diepte boven 15 m wordt onverminderd als feit vastgelegd en blokkeert de berekening voor die duik.
+- De getalsvelden voor druk zetten bij het verlaten van het veld een waarde buiten bereik of een niet-numerieke waarde terug, met een korte melding. De dieptevelden worden hierbij niet naar 15 m teruggezet; een geregistreerd feit blijft staan.
+- Het keuzemenu Duiksysteem toont SCUBA_OLV bovenaan en een schone start kiest SCUBA_OLV als beginwaarde. De toegestane waarden en de validatie blijven gelijk.
+- Het plaatsaanduidingsveld bij Aanduiding gebruikt nu hetzelfde neutrale streepje als de andere velden in die rij.
+- Het drukcheck-geluid staat standaard aan.
+- Alles wissen vraagt nu eerst om bevestiging en daarna om het woord WIS exact over te typen voordat er iets wordt gewist.
+- Appversielabel verhoogd naar v1.13.0; de bijbehorende zelftest controleert mee op v1.13.0. version.json bijgewerkt naar v1.13.0.
+- Het opstart-zelftal gaat van 377 naar 389 door de vijf nieuwe zelftests met hun tegencontroles en een gesplitste controle op de standaard actieve duikers.
+
+### Niet gewijzigd
+
+- Rekenkern, tabelwaarden, blokkeerlogica, statussemantiek, validatie en schema zijn niet aangeraakt. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd. Het gedrag van de updatecontrole en de installatiestrook blijft gelijk. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.12.0] - 2026-06-22
 
 De versiemelding "Nieuwe versie beschikbaar" staat niet langer als zwevende balk over de inhoud, maar als vaste strook in de pagina.
