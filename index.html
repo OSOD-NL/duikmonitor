@@ -272,12 +272,12 @@
     .card h2{font-size:20px}.card h3{font-size:16px}
     .muted{color:var(--text-muted)}
     .small{font-size:12px}.note{font-size:13px;line-height:1.45;color:var(--text-note)}
-    .headline{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin:0 0 10px 0;width:100%}
+    .headline{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin:0 0 10px 0;width:100%;position:relative}
     .headline h2,.headline h3{margin:0!important;min-width:0;flex:1 1 auto}
-    details.info{display:block;position:relative;margin:-2px 0 0 auto;flex:0 0 auto}
+    details.info{display:block;position:static;margin:-2px 0 0 auto;flex:0 0 auto}
     details.info>summary{
       list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
-      width:20px;height:20px;min-width:20px;border-radius:999px;
+      width:20px;height:20px;min-width:20px;border-radius:999px;position:relative;
       border:1px solid var(--info-summary-border);background:var(--info-summary-bg);
       color:var(--info-summary-text);font-weight:900;font-size:11px;line-height:1;user-select:none;
     }
@@ -288,6 +288,9 @@
       margin-top:8px;padding:10px 12px;border-radius:12px;border:1px solid var(--line-soft);
       background:var(--surface-hint-info);color:var(--text-note);font-size:13px;line-height:1.45;
       max-width:min(720px,calc(100vw - 48px));
+    }
+    details.info[open]>.info-body{
+      position:absolute;left:0;right:0;top:100%;margin-top:8px;max-width:none;z-index:1;
     }
     .divehead>div:first-child{flex:1 1 auto;min-width:0}
     .span12{grid-column:span 12}.span8{grid-column:span 8}.span6{grid-column:span 6}.span4{grid-column:span 4}.span3{grid-column:span 3}
@@ -576,7 +579,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.13.0";
+  const APP_VERSION = "v1.14.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -1099,6 +1102,21 @@
     return label ? `${code} · ${label}` : code;
   };
   const isDiverActive = diver => diver && diver.active !== false;
+  // Onderdeel 2 (v1.14.0): de knop "+ Duiker erbij" aan de waterkant activeert het
+  // eerstvolgende nog inactieve duikerslot. Eén bron van waarheid voor render, wiring en
+  // zelftest: nextInactiveDiverIndex geeft de laagste index met een inactief slot, of -1
+  // als alle sloten actief zijn. addNextDiver zet uitsluitend active op true; nooit op
+  // false, nooit een nieuw slot, nooit hernummering. Het aantal sloten blijft DIVER_SLOT_COUNT.
+  function nextInactiveDiverIndex(){
+    ensureDivers();
+    return state.divers.findIndex(d => !isDiverActive(d));
+  }
+  function addNextDiver(){
+    const i = nextInactiveDiverIndex();
+    if(i < 0) return false;
+    state.divers[i].active = true;
+    return true;
+  }
   function activeDivers(){
     ensureDivers();
     return state.divers.filter(isDiverActive);
@@ -2538,11 +2556,12 @@
     const liveDivers = visibleDiversForDataset("live");
     document.getElementById("liveScreen").innerHTML = `<div class="grid">
       ${projectBlock()}
-      <div class="card span12 screen-intro"><div class="headline"><h2>Dagregistratie aan de waterkant</h2><details class="info no-print"><summary title="Uitleg Dagregistratie" aria-label="Uitleg Dagregistratie">i</summary><div class="info-body">Vul eerst Begindruk (bar) in. Start duik stempelt daarna de tijd en opent de ademluchtbewaking tot 100 bar. Zodra een duiker boven is, verschijnt de herhalingsduik-vooruitblik: de actuele herhalingsfactor en herhalings-NDL op basis van het lopende oppervlakte-interval, plus de tijdstippen waarop de HF gunstiger wordt tot HF weer 1,0 is. Indicatief; het vervangt de tabel en het DPL-oordeel niet.</div></details></div><div class="diver-grid">${liveDivers.map(d=>renderLiveDiver(d, calc)).join("")}</div></div>
+      <div class="card span12 screen-intro"><div class="headline"><h2>Dagregistratie aan de waterkant</h2><details class="info no-print"><summary title="Uitleg Dagregistratie" aria-label="Uitleg Dagregistratie">i</summary><div class="info-body">Vul eerst Begindruk (bar) in. Start duik stempelt daarna de tijd en opent de ademluchtbewaking tot 100 bar. Zodra een duiker boven is, verschijnt de herhalingsduik-vooruitblik: de actuele herhalingsfactor en herhalings-NDL op basis van het lopende oppervlakte-interval, plus de tijdstippen waarop de HF gunstiger wordt tot HF weer 1,0 is. Indicatief; het vervangt de tabel en het DPL-oordeel niet. Met "+ Duiker erbij" activeer je hier het eerstvolgende duikerslot; uitschakelen doe je met het vinkje Actief bij Instellingen.</div></details></div><div class="diver-grid">${liveDivers.map(d=>renderLiveDiver(d, calc)).join("")}</div><div class="btnrow no-print"><button class="ghost no-print" id="addNextDiver"${nextInactiveDiverIndex() < 0 ? " disabled" : ""}>+ Duiker erbij</button></div></div>
       <div class="card span12"><div class="divehead"><div><div class="headline"><h2>Werkelijke duikregels</h2><details class="info no-print"><summary title="Uitleg Werkelijke duikregels" aria-label="Uitleg Werkelijke duikregels">i</summary><div class="info-body">Achteraf formulier overnemen of live regels corrigeren. Gebruik Registratievorm en Fasen / rolmomenten voor gecombineerde duiken en RD/ResD-wissels.</div></details></div></div><button class="primary no-print" id="addLive" title="Handmatige duikregel toevoegen">+ Regel</button></div>${renderDiveEditor("live", state.live, calc)}</div>
     </div>`;
     wireProject(); wireDiveEditor("live"); wireLiveButtons();
     document.getElementById("addLive").onclick=()=>mutate(()=>state.live.push(newBlankLiveDive()));
+    (function(){ const b=document.getElementById("addNextDiver"); if(b) b.onclick=()=>{ if(nextInactiveDiverIndex() < 0) return; mutate(()=>{ addNextDiver(); }); }; })();
   }
   function newLiveDive(diverId, airStartBar){
     const div=state.divers.find(d=>d.id===diverId);
@@ -3437,7 +3456,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.13.0", APP_VERSION, APP_VERSION==="v1.13.0");
+    push("basis","Appversielabel", "v1.14.0", APP_VERSION, APP_VERSION==="v1.14.0");
     // version.json-zelftest (B-0030): controleert dat het veld "version" in het bestand
     // version.json exact gelijk is aan APP_VERSION, zodat een niet-meegeschoven
     // version.json het zelftal laat zakken en niet stil kan misgaan. De vergeleken waarde
@@ -3488,7 +3507,7 @@
       try {
         // Groene stand: vinkje aanwezig, zichtbaar woord "geverifieerd" weg, aria-label
         // bevat het woord wel, telling en versie staan in de badge.
-        bootGate = { status:"green", passed:389, total:389, nonCritFail:0, critFail:0, failedCritical:[] };
+        bootGate = { status:"green", passed:391, total:391, nonCritFail:0, critFail:0, failedCritical:[] };
         updateVerifyBadge();
         const g = rendered(badgeEl);
         const ariaTag = 'aria-label="geverifieerd"';
@@ -3496,20 +3515,20 @@
         const groenGeenZichtbaarWoord = !gZonderAria.includes("geverifieerd");
         const groenVinkje = g.includes("\u2713");
         const groenAria = g.includes(ariaTag);
-        const groenTelling = g.includes("389/389");
+        const groenTelling = g.includes("391/391");
         const groenVersie = g.includes(APP_VERSION);
         const groenOk = groenGeenZichtbaarWoord && groenVinkje && groenAria && groenTelling && groenVersie;
         detail.push(`groen[vinkje=${groenVinkje} aria=${groenAria} telling=${groenTelling} versie=${groenVersie} geenWoord=${groenGeenZichtbaarWoord}]`);
         alleOk = alleOk && groenOk;
         // Oranje stand: tekst behouden.
-        bootGate = { status:"amber", passed:388, total:389, nonCritFail:1, critFail:0, failedCritical:[] };
+        bootGate = { status:"amber", passed:390, total:391, nonCritFail:1, critFail:0, failedCritical:[] };
         updateVerifyBadge();
         const a = rendered(badgeEl);
         const oranjeOk = a.includes("kern OK") && a.includes("niet-kritieke melding(en)");
         detail.push(`oranje[kernOK=${a.includes("kern OK")} melding=${a.includes("niet-kritieke melding(en)")}]`);
         alleOk = alleOk && oranjeOk;
         // Rode stand: tekst behouden.
-        bootGate = { status:"red", passed:0, total:389, nonCritFail:0, critFail:2, failedCritical:["x","y"] };
+        bootGate = { status:"red", passed:0, total:391, nonCritFail:0, critFail:2, failedCritical:["x","y"] };
         updateVerifyBadge();
         const r = rendered(badgeEl);
         const roodOk = r.includes("NIET GEVERIFIEERD") && r.includes("kritieke fout(en)");
@@ -3742,6 +3761,174 @@
       push("ui","Punt 7 (negatieve controle): bevestigingsgrendel accepteert alleen exact WIS",
         "WIS=ok; wis/leeg/spatie=nee", `WIS=${resetConfirmPhraseOk("WIS")?'ok':'nee'}; wis=${resetConfirmPhraseOk("wis")?'ok':'nee'}; leeg=${resetConfirmPhraseOk("")?'ok':'nee'}; spatie=${resetConfirmPhraseOk(" WIS ")?'ok':'nee'}`,
         resetConfirmPhraseOk("WIS")===true && resetConfirmPhraseOk("wis")===false && resetConfirmPhraseOk("")===false && resetConfirmPhraseOk(" WIS ")===true);
+    })();
+    // ===== v1.14.0 UI-interactietests (B-0024) =====
+    // Onderdeel 1: het uitleg-i-knopje blijft op zijn plek bij openen. Of de summary bij
+    // openen op dezelfde regel/horizontale plek blijft is een layout-uitkomst die de
+    // Node-mock niet via getComputedStyle of compareDocumentPosition kan bepalen. We toetsen
+    // daarom op de bron die in beide contexten beschikbaar is: de CSS-tekst (browser:
+    // <style>; Node: __DUIKMONITOR_CSS__). De fix is dat de geopende .info-body uit de
+    // flexstroom van .headline loopt (position:absolute, volle breedte onder de titelregel),
+    // zodat de details/summary-rij niet meer afbreekt en de summary niet meeverhuist. We
+    // controleren ook dat de details/summary-toon-en-verberg-werking onaangetast blijft op
+    // de gerenderde kaart, en dat de summary margin-left:auto rechts houdt.
+    (function(){
+      function placementCss(){
+        let css = "";
+        try{ if(typeof __DUIKMONITOR_CSS__ === "string" && __DUIKMONITOR_CSS__) css = __DUIKMONITOR_CSS__; }catch(e){}
+        if(!css){ try{ const el = document.querySelector("style"); if(el && el.textContent) css = el.textContent; }catch(e){} }
+        return css;
+      }
+      // Snijd een CSS-regel selector{...} uit op de eerste match.
+      function ruleFor(css, selector){
+        const i = css.indexOf(selector + "{");
+        if(i < 0) return "";
+        const open = i + selector.length;
+        const close = css.indexOf("}", open);
+        if(close < 0) return "";
+        return css.slice(i, close + 1);
+      }
+      const detail = [];
+      let alleOk = true;
+      try{
+        const css = placementCss();
+        const headlineRule = ruleFor(css, ".headline");
+        const detailsRule = ruleFor(css, "details.info");
+        const openBodyRule = ruleFor(css, "details.info[open]>.info-body");
+        // .headline is de positioneringscontext (position:relative) voor de geopende body.
+        const headlineRelatief = headlineRule.indexOf("position:relative") >= 0;
+        // De geopende .info-body loopt uit de flow: position:absolute en volle breedte
+        // (left:0 en right:0) onder de titelregel (top:100%). Zo beïnvloedt hij de
+        // flex-wrap-rij van .headline niet meer en breekt de summary niet af.
+        const bodyAbsoluut = openBodyRule.indexOf("position:absolute") >= 0;
+        const bodyVolleBreedte = openBodyRule.indexOf("left:0") >= 0 && openBodyRule.indexOf("right:0") >= 0;
+        const bodyOnderRij = openBodyRule.indexOf("top:100%") >= 0;
+        // De summary blijft rechts uitgelijnd: details.info houdt margin-left:auto.
+        const summaryRechts = detailsRule.indexOf("margin:-2px 0 0 auto") >= 0;
+        detail.push(`css[headlineRel=${headlineRelatief} bodyAbs=${bodyAbsoluut} volle=${bodyVolleBreedte} onder=${bodyOnderRij} rechts=${summaryRechts}]`);
+        alleOk = alleOk && headlineRelatief && bodyAbsoluut && bodyVolleBreedte && bodyOnderRij && summaryRechts;
+        // Toon/verberg-werking ongemoeid: de gerenderde live-kaart bevat een details.info
+        // met summary en .info-body; openen wordt door details[open] gedaan (native),
+        // dus de body-inhoud staat in de bron en de summary draagt het i-teken.
+        const live = testState({}, ()=>{ renderLive(); const el = document.getElementById("liveScreen"); return el ? el.innerHTML : ""; });
+        const heeftDetails = live.indexOf('<details class="info no-print">') >= 0;
+        const heeftSummary = live.indexOf('<summary title="Uitleg Dagregistratie"') >= 0;
+        const heeftBody = live.indexOf('class="info-body"') >= 0;
+        detail.push(`dom[details=${heeftDetails} summary=${heeftSummary} body=${heeftBody}]`);
+        alleOk = alleOk && heeftDetails && heeftSummary && heeftBody;
+        // Negatieve grendel (anti-tautologie): dezelfde asserties op vervalste invoer
+        // MOETEN falen. Het oude meebreek-gedrag is een .info-body die IN de flow blijft
+        // (geen position:absolute, geen left/right/top), waardoor het details-blok de rij
+        // verbreedt en de summary meeverhuist. Zo'n regel wordt hier expliciet afgekeurd.
+        const valsBody = "details.info[open]>.info-body{margin-top:8px}";
+        const valsAbs = valsBody.indexOf("position:absolute") >= 0;
+        const valsVolle = valsBody.indexOf("left:0") >= 0 && valsBody.indexOf("right:0") >= 0;
+        const valsOnder = valsBody.indexOf("top:100%") >= 0;
+        const grendelValt = valsAbs === false && valsVolle === false && valsOnder === false;
+        detail.push(`grendel[valsAbs=${valsAbs} valsVolle=${valsVolle} valsOnder=${valsOnder} valt=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){
+        alleOk = false;
+        detail.push("uitzondering: " + (e && e.message ? e.message : String(e)));
+      }
+      push("ui","Onderdeel 1: i-knopje blijft op zijn plek (geopende info-body loopt uit de flexstroom), toon/verberg ongemoeid, negatieve grendel valt",
+        "headline relatief, body absoluut/volle-breedte/onder de rij, summary rechts, details/summary aanwezig, grendel valt",
+        detail.join(" "),
+        alleOk);
+    })();
+    // Onderdeel 2: de knop "+ Duiker erbij" activeert het eerstvolgende inactieve duikerslot
+    // (alleen erbij). We draaien de echte mutatie-actie addNextDiver via de echte state en
+    // controleren het aantal en welke slot werd geactiveerd, plus dat de knop in de
+    // gerenderde live-kaart onder de diver-grid staat en bij twaalf actief uitgeschakeld is.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        // Start bij de defaultState-situatie: vier actief (D1 t/m D4). Eén aanroep activeert
+        // precies één extra slot, en wel het eerstvolgende (laagste inactieve code = D5).
+        const een = testState({}, ()=>{
+          const voor = state.divers.filter(isDiverActive).length;
+          const idx = nextInactiveDiverIndex();
+          const codeVan = state.divers[idx] ? state.divers[idx].code : "";
+          const ok = addNextDiver();
+          const na = state.divers.filter(isDiverActive).length;
+          const codeActief = isDiverActive(getDiver("D5"));
+          return {voor, na, idxCode:codeVan, ok, codeActief, totaal:state.divers.length};
+        });
+        const eenOk = een.voor===4 && een.na===5 && een.idxCode==="D5" && een.ok===true && een.codeActief===true && een.totaal===12;
+        detail.push(`een[voor=${een.voor} na=${een.na} slot=${een.idxCode} actief=${een.codeActief} totaal=${een.totaal}]`);
+        alleOk = alleOk && eenOk;
+        // Herhaald aanroepen activeert telkens één slot erbij tot alle twaalf actief zijn;
+        // daarna voegt een verdere aanroep niets toe (blijft twaalf; nooit dertien; nooit een
+        // nieuw slot). De knop is dan uitgeschakeld/afwezig (nextInactiveDiverIndex == -1).
+        const totVol = testState({}, ()=>{
+          let stappen = 0;
+          while(nextInactiveDiverIndex() >= 0 && stappen < 50){ addNextDiver(); stappen++; }
+          const naVol = state.divers.filter(isDiverActive).length;
+          const totaalNaVol = state.divers.length;
+          const extra = addNextDiver(); // mag niets meer doen
+          const naExtra = state.divers.filter(isDiverActive).length;
+          const totaalNaExtra = state.divers.length;
+          const knopUit = nextInactiveDiverIndex() < 0;
+          return {stappen, naVol, totaalNaVol, extra, naExtra, totaalNaExtra, knopUit};
+        });
+        // Vanaf 4 actief zijn er 8 inactieve sloten; dus 8 stappen tot twaalf.
+        const volOk = totVol.stappen===8 && totVol.naVol===12 && totVol.totaalNaVol===12 && totVol.extra===false && totVol.naExtra===12 && totVol.totaalNaExtra===12 && totVol.knopUit===true;
+        detail.push(`vol[stappen=${totVol.stappen} naVol=${totVol.naVol} extra=${totVol.extra} naExtra=${totVol.naExtra} totaal=${totVol.totaalNaExtra} knopUit=${totVol.knopUit}]`);
+        alleOk = alleOk && volOk;
+        // Alleen-erbij: na de actie is geen eerder actief slot op inactief gezet. We starten
+        // met D1 t/m D4 actief en controleren dat die alle vier actief blijven na een aanroep.
+        const alleenErbij = testState({}, ()=>{
+          const voorActief = state.divers.filter(isDiverActive).map(d=>d.code).join(",");
+          addNextDiver();
+          const d1234 = ["D1","D2","D3","D4"].every(id=>isDiverActive(getDiver(id)));
+          return {voorActief, d1234};
+        });
+        const erbijOk = alleenErbij.voorActief==="D1,D2,D3,D4" && alleenErbij.d1234===true;
+        detail.push(`erbij[voor=${alleenErbij.voorActief} d1234blijft=${alleenErbij.d1234}]`);
+        alleOk = alleOk && erbijOk;
+        // Gerenderde knop: onder de diver-grid in de live-kaart, met exact label en no-print,
+        // en bij twaalf actief disabled.
+        const render4 = testState({}, ()=>{ renderLive(); const el=document.getElementById("liveScreen"); return el?el.innerHTML:""; });
+        const knopAanwezig = render4.indexOf('id="addNextDiver"') >= 0;
+        const labelGoed = render4.indexOf('+ Duiker erbij') >= 0;
+        const noPrint = /<button class="ghost no-print" id="addNextDiver"/.test(render4);
+        const gridIdx = render4.indexOf('class="diver-grid"');
+        const knopIdx = render4.indexOf('id="addNextDiver"');
+        const knopOnderGrid = gridIdx >= 0 && knopIdx >= 0 && knopIdx > gridIdx;
+        const render4Disabled = /id="addNextDiver" disabled/.test(render4);
+        const render12 = testState({divers:Array.from({length:12},(_,i)=>({id:"D"+(i+1),code:"D"+(i+1),label:"",active:true,defaultMdd:6}))}, ()=>{ renderLive(); const el=document.getElementById("liveScreen"); return el?el.innerHTML:""; });
+        const render12Disabled = /id="addNextDiver" disabled/.test(render12);
+        detail.push(`render[knop=${knopAanwezig} label=${labelGoed} noprint=${noPrint} ondergrid=${knopOnderGrid} 4disabled=${render4Disabled} 12disabled=${render12Disabled}]`);
+        alleOk = alleOk && knopAanwezig && labelGoed && noPrint && knopOnderGrid && render4Disabled===false && render12Disabled===true;
+        // Negatieve grendel (anti-tautologie): een actie die MEER dan één slot tegelijk zou
+        // activeren of een ANDER dan het eerstvolgende slot zou kiezen, MOET afgekeurd worden.
+        // We modelleren beide foute uitkomsten en eisen dat de controles ze afwijzen.
+        const valsMeer = testState({}, ()=>{
+          const voor = state.divers.filter(isDiverActive).length;
+          // foute actie: twee sloten tegelijk
+          let n=0; for(let i=0;i<state.divers.length && n<2;i++){ if(!isDiverActive(state.divers[i])){ state.divers[i].active=true; n++; } }
+          const na = state.divers.filter(isDiverActive).length;
+          return {voor, na};
+        });
+        const meerAfgekeurd = !((valsMeer.na - valsMeer.voor) === 1); // echte actie zou exact +1 geven; +2 wordt afgekeurd
+        const valsAnder = testState({}, ()=>{
+          // foute actie: niet D5 maar D6 activeren terwijl D5 nog inactief is
+          const d6 = getDiver("D6"); if(d6) d6.active = true;
+          return {d5Actief: isDiverActive(getDiver("D5")), d6Actief: isDiverActive(getDiver("D6"))};
+        });
+        const anderAfgekeurd = valsAnder.d5Actief === false && valsAnder.d6Actief === true; // eerstvolgende (D5) bleef inactief => fout
+        const grendelValt = meerAfgekeurd === true && anderAfgekeurd === true;
+        detail.push(`grendel[meerAfgekeurd=${meerAfgekeurd} anderAfgekeurd=${anderAfgekeurd} valt=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){
+        alleOk = false;
+        detail.push("uitzondering: " + (e && e.message ? e.message : String(e)));
+      }
+      push("ui","Onderdeel 2: + Duiker erbij activeert exact het eerstvolgende inactieve slot (D5 bij vier actief), tot twaalf, alleen-erbij, knop onder de grid en bij twaalf uitgeschakeld, negatieve grendel valt",
+        "voor=4 na=5 slot=D5; tot 12 in 8 stappen, geen 13e, geen nieuw slot; D1-D4 blijven; knop onder grid, 12=disabled; grendel valt",
+        detail.join(" "),
+        alleOk);
     })();
     // UI-interactietest (B-0024-geest): de updatemelding #updateBar staat als in-flow
     // strook (installbar-stijl) BOVEN de installatiestrook, niet als zwevende pil. We
