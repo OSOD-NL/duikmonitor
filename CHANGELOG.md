@@ -2,6 +2,18 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.17.0] - 2026-06-24
+
+Een attente diepte-bevestiging bij het starten van een live-duik aan de waterkant. Net als de begindruk wordt nu ook de diepte op het juiste moment eenmalig bevestigd, zodat een duik niet ongemerkt op een onaangeraakte standaarddiepte start. Het blijft een bevestiging, geen blokkade: via OK kan altijd worden doorgegaan. De rekenkern, de blokkeerlogica en alle registratielagen blijven ongemoeid.
+
+### Toegevoegd
+
+- Bij Start duik verschijnt eenmalig een diepte-bevestiging ("Diepte voor deze duik is X m. Klopt dat?") met de actuele standaard-MDD van die duiker, nadat de begindruk geldig is bevonden en voordat de duik wordt aangemaakt. Bij OK start de duik met die diepte en komt de vraag niet opnieuw voor deze duiker; bij Annuleren start de duik niet en kan de diepte eerst worden aangepast. De bevestiging hangt bewust niet af van de dieptewaarde maar van de vraag of de diepte voor deze duiker al bewust is bevestigd of bewust is gezet, zodat een terechte ondiepe duik niet telkens wordt lastiggevallen. Het wijzigen van het MDD-veld (in de Duikerstabel of het live MDD-veld) geldt als een bewuste diepte-actie en onderdrukt de vraag voor die duiker. Na Alles wissen vraagt de eerste duik weer om bevestiging. Drie UI-interactietests met tegencontrole borgen dit gedrag.
+
+### Niet gewijzigd
+
+- De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de blokkeerlogica (waaronder de blokkade boven 15 m), het statusmodel en de validatie zijn niet aangeraakt. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd, evenals het schema en de updatecontrole. De rekenwaarde van de MDD en de terugval op 6 (cleanMddValue met fallback 6) blijven inhoudelijk gelijk; dit is geen leeg-veld- of verplicht-veld-wijziging in de zin van de standaard. De begindruk-controle bij de start is functioneel onveranderd: er is feitelijk een enkel handmatig start-pad en de bestaande melding geldt daar als vanouds.
+
 ## [1.16.0] - 2026-06-24
 
 Een opmaak- en labelronde voor de Duikerstabel op de Instellingen-pagina: kortere kolomkoppen, een gelijkmatige kolomverdeling in portretmodus en een kleiner maar goed aantikbaar Actief-vinkje. De rekenkern en alle registratielagen blijven ongemoeid.

@@ -585,7 +585,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.16.0";
+  const APP_VERSION = "v1.17.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -1196,6 +1196,18 @@
   let reportDataset = "planning";
   let selftestMode = "all";
   let pendingStartBars = {};
+  // Vluchtige markering per duiker of de diepte (MDD) voor de eerstvolgende start bewust is
+  // bevestigd of bewust is gezet. Net als pendingStartBars staat dit bewust niet in de
+  // opgeslagen state: het is een bedieningssignaal voor deze sessie, geen registratiegegeven.
+  // Een gezette markering onderdrukt de diepte-bevestiging bij Start duik voor die duiker;
+  // resetAllData en de begintoestand wissen de markering zodat de eerste duik na een schone
+  // start opnieuw bevestiging vraagt.
+  let depthConfirmed = {};
+  // Mockbare bevestigingsvraag voor de diepte, zodat de zelftest de bevestiging kan
+  // registreren zonder echte prompt. De gate-logica (ensureDepthConfirmed) leunt niet op
+  // deze functie maar op de markering en een meegegeven bevestiger, in de lijn van
+  // resetConfirmPhraseOk/attemptReset.
+  let confirmDepthFn = (mddVal) => confirm(`Diepte voor deze duik is ${mddVal} m. Klopt dat?`);
   let pendingAirInputs = {};
   let pendingAirDepthInputs = {};
   let pendingEndBars = {};
@@ -2620,6 +2632,19 @@
     state.live.push(newLiveDive(diverId, bar));
     return true;
   }
+  // Diepte-bevestiging bij start. Pure grendel, geen DOM en geen eigen prompt, zodat de
+  // zelftest hem aantoonbaar kan toetsen. Hangt NIET af van de dieptewaarde (geen "alleen
+  // als het 6 is"), maar van de vraag of de diepte voor deze duiker al bewust is bevestigd
+  // of bewust is gezet (markering depthConfirmed). Is de markering gezet, dan mag de start
+  // zonder vraag door. Anders wordt de meegegeven bevestiger aangeroepen met de actuele MDD;
+  // bevestigt die (OK), dan wordt de markering gezet en mag de start door, anders niet.
+  // Het is uitdrukkelijk geen harde blokkade: via OK kan altijd worden doorgegaan.
+  function ensureDepthConfirmed(diverId, mddVal, confirmer){
+    if(depthConfirmed[diverId]) return true;
+    const ask = typeof confirmer === "function" ? confirmer : confirmDepthFn;
+    if(ask(mddVal)){ depthConfirmed[diverId] = true; return true; }
+    return false;
+  }
   function validBar(value){
     const n = parseNum(value);
     return Number.isFinite(n) && n > 0 && n <= MAX_BAR ? n : null;
@@ -2864,7 +2889,7 @@
   }
   function wireLiveButtons(){
     document.querySelectorAll("[data-default-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.divers.find(x=>x.id===inp.dataset.defaultMdd); if(d){ const raw=parseNum(inp.value); const v=cleanMddValue(inp.value,{clamp:true,fallback:6}); if(Number.isFinite(raw) && raw>MAX_MDD) alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); d.defaultMdd=v; inp.value=v; } }));
-    document.querySelectorAll("[data-active-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.activeMdd); if(d){ const raw=parseNum(inp.value); const v=cleanActualMddValue(inp.value,{fallback:d.mdd||6}); if(Number.isFinite(raw) && raw>MAX_MDD) alert("Let op: diepte boven 15 m ligt buiten de rekenenvelop (no-deco tot 15 m). De waarde wordt als feit geregistreerd; de DCIEM-berekening blokkeert voor deze duik."); d.mdd=v; inp.value=v; updateAirCheckInterval(d); } }));
+    document.querySelectorAll("[data-active-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.activeMdd); if(d){ const raw=parseNum(inp.value); const v=cleanActualMddValue(inp.value,{fallback:d.mdd||6}); if(Number.isFinite(raw) && raw>MAX_MDD) alert("Let op: diepte boven 15 m ligt buiten de rekenenvelop (no-deco tot 15 m). De waarde wordt als feit geregistreerd; de DCIEM-berekening blokkeert voor deze duik."); d.mdd=v; inp.value=v; if(d.diverId) depthConfirmed[d.diverId]=true; updateAirCheckInterval(d); } }));
     document.querySelectorAll("[data-start-bar]").forEach(inp=>{
       pendingStartBars[inp.dataset.startBar] = inp.value;
       inp.oninput = ()=>{ pendingStartBars[inp.dataset.startBar] = inp.value; };
@@ -2876,6 +2901,11 @@
       const inp = document.querySelector(`[data-start-bar="${diverId}"]`);
       const n = validBar(inp?.value);
       if(n == null){ alert(`Vul eerst een geldige begindruk in (1-${MAX_BAR} bar).`); inp?.focus(); return; }
+      // Diepte-bevestiging: dezelfde MDD die straks naar de duik gaat (zie newLiveDive),
+      // vóór het aanmaken van de duik. Bij Annuleren start de duik niet; de gebruiker kan
+      // eerst de diepte aanpassen (dat zet de markering) en opnieuw starten.
+      const startMdd = cleanMddValue(getDiver(diverId)?.defaultMdd, {clamp:true, fallback:6});
+      if(!ensureDepthConfirmed(diverId, startMdd)) return;
       mutate(()=>{ if(startLiveDiveFor(diverId, n)) delete pendingStartBars[diverId]; });
     });
     document.querySelectorAll("[data-live-ascent]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=latestActiveDive(btn.dataset.liveAscent); if(d && !d.ascentStart) stampField(d, "ascentStart", new Date()); }); });
@@ -3508,7 +3538,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.16.0", APP_VERSION, APP_VERSION==="v1.16.0");
+    push("basis","Appversielabel", "v1.17.0", APP_VERSION, APP_VERSION==="v1.17.0");
     // version.json-zelftest (B-0030): controleert dat het veld "version" in het bestand
     // version.json exact gelijk is aan APP_VERSION, zodat een niet-meegeschoven
     // version.json het zelftal laat zakken en niet stil kan misgaan. De vergeleken waarde
@@ -4658,6 +4688,57 @@
     push("bediening","Duikset en masker worden bij start vastgelegd", "07 / 08", `${materialStored.setNo}/${materialStored.maskNo}`, materialStored.started===true && materialStored.setNo==="07" && materialStored.maskNo==="08");
     const duplicateStart = testState({},()=>{ const first=startLiveDiveFor("D1",300); const second=startLiveDiveFor("D1",300); return {first, second, count:state.live.length}; });
     push("bediening","Dubbele Start duik wordt voorkomen", "eerste ja / tweede nee / 1 actieve duik", `${duplicateStart.first}/${duplicateStart.second}/${duplicateStart.count}`, duplicateStart.first===true && duplicateStart.second===false && duplicateStart.count===1);
+    // Diepte-bevestiging bij start (v1.17.0). De gate ensureDepthConfirmed is een pure
+    // grendel; we toetsen hem met een registrerende bevestiger en beheren de vluchtige
+    // markering depthConfirmed expliciet zodat de tests onafhankelijk en niet-tautologisch
+    // zijn (testState herstelt alleen state, niet deze markering).
+    // 1. Begindruk-test: starten zonder geldige begindruk levert geen duik; met geldige
+    //    begindruk wel. Borgt dat de start-paden het bestaande begindruk-gedrag houden.
+    const startBarGate = testState({},()=>{ const leeg=startLiveDiveFor("D1",""); const naLeeg=state.live.length; const geldig=startLiveDiveFor("D1",300); return {leeg, naLeeg, geldig, count:state.live.length}; });
+    push("bediening","Start duik: lege begindruk weigert, geldige begindruk start", "leeg nee / 0 / geldig ja / 1", `leeg ${startBarGate.leeg} / ${startBarGate.naLeeg} / geldig ${startBarGate.geldig} / ${startBarGate.count}`, startBarGate.leeg===false && startBarGate.naLeeg===0 && startBarGate.geldig===true && startBarGate.count===1);
+    // 2. Diepte-bevestiging-test: zonder voorafgaande bewuste diepte-actie wordt de
+    //    bevestiging getoond. Bij Annuleren geen duik; bij OK wel, met de verwachte MDD.
+    //    Negatieve controle: de registrerende bevestiger MOET zijn aangeroepen (gevraagd),
+    //    anders blijft gevraagd=false en faalt de test; en bij Annuleren mag er geen duik zijn.
+    const bevestigAnnuleer = testState({divers:[{id:"D1",label:"",defaultMdd:6}]},()=>{
+      const oudeMark=depthConfirmed; depthConfirmed={};
+      let gevraagd=false, gevraagdeMdd=null;
+      const annuleer=(m)=>{ gevraagd=true; gevraagdeMdd=m; return false; };
+      const startMdd=cleanMddValue(getDiver("D1")?.defaultMdd,{clamp:true,fallback:6});
+      const mag=ensureDepthConfirmed("D1", startMdd, annuleer);
+      const startte = mag ? startLiveDiveFor("D1",300) : false;
+      const res={gevraagd, gevraagdeMdd, mag, startte, count:state.live.length};
+      depthConfirmed=oudeMark; return res;
+    });
+    push("bediening","Diepte-bevestiging: zonder bewuste actie wordt gevraagd en Annuleren start geen duik", "gevraagd ja / 6 m / mag nee / 0 duiken", `gevraagd ${bevestigAnnuleer.gevraagd} / ${bevestigAnnuleer.gevraagdeMdd} m / mag ${bevestigAnnuleer.mag} / ${bevestigAnnuleer.count}`, bevestigAnnuleer.gevraagd===true && parseNum(bevestigAnnuleer.gevraagdeMdd)===6 && bevestigAnnuleer.mag===false && bevestigAnnuleer.startte===false && bevestigAnnuleer.count===0);
+    const bevestigOk = testState({divers:[{id:"D1",label:"",defaultMdd:6}]},()=>{
+      const oudeMark=depthConfirmed; depthConfirmed={};
+      let gevraagd=false;
+      const ok=(m)=>{ gevraagd=true; return true; };
+      const startMdd=cleanMddValue(getDiver("D1")?.defaultMdd,{clamp:true,fallback:6});
+      const mag=ensureDepthConfirmed("D1", startMdd, ok);
+      const startte = mag ? startLiveDiveFor("D1",300) : false;
+      const res={gevraagd, mag, startte, mdd:state.live[0]?.mdd, count:state.live.length};
+      depthConfirmed=oudeMark; return res;
+    });
+    push("bediening","Diepte-bevestiging: na OK start de duik met de verwachte MDD", "gevraagd ja / mag ja / start ja / MDD 6 / 1 duik", `gevraagd ${bevestigOk.gevraagd} / mag ${bevestigOk.mag} / start ${bevestigOk.startte} / MDD ${bevestigOk.mdd} / ${bevestigOk.count}`, bevestigOk.gevraagd===true && bevestigOk.mag===true && bevestigOk.startte===true && parseNum(bevestigOk.mdd)===6 && bevestigOk.count===1);
+    // 3. Geen-herhaling-test: na een bewuste diepte-actie (markering gezet) wordt bij de
+    //    start niet meer gevraagd. Negatieve controle: bij een onaangeraakte diepte (markering
+    //    leeg) wordt met dezelfde bevestiger juist wel gevraagd. Zo is de onderdrukking
+    //    bewezen voorwaardelijk en niet onvoorwaardelijk.
+    const geenHerhaling = testState({divers:[{id:"D1",label:"",defaultMdd:6}]},()=>{
+      const oudeMark=depthConfirmed;
+      let gevraagdGezet=false, gevraagdLeeg=false;
+      // markering gezet (alsof de MDD bewust is gewijzigd): niet vragen
+      depthConfirmed={D1:true};
+      const magGezet=ensureDepthConfirmed("D1", 6, ()=>{ gevraagdGezet=true; return false; });
+      // markering leeg (onaangeraakt): wel vragen
+      depthConfirmed={};
+      const magLeeg=ensureDepthConfirmed("D1", 6, ()=>{ gevraagdLeeg=true; return true; });
+      depthConfirmed=oudeMark;
+      return {gevraagdGezet, magGezet, gevraagdLeeg, magLeeg};
+    });
+    push("bediening","Diepte-bevestiging: na bewuste diepte-actie geen herhaling, onaangeraakt wel", "gezet niet gevraagd + mag / leeg wel gevraagd", `gezet gevraagd ${geenHerhaling.gevraagdGezet}/mag ${geenHerhaling.magGezet} · leeg gevraagd ${geenHerhaling.gevraagdLeeg}`, geenHerhaling.gevraagdGezet===false && geenHerhaling.magGezet===true && geenHerhaling.gevraagdLeeg===true && geenHerhaling.magLeeg===true);
     const interval89 = testState({live:[ensureAirFields({id:"int89",diverId:"D1",start:`${today}T09:00:00`,mdd:8.9,daypart:"1",rule:"auto",notes:"",airStartBar:300})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:01:00`)).checkIntervalMin);
     push("lucht","Drukcheck bij MDD 8,9 blijft 10 min", "10 min", `${interval89} min`, interval89===10);
     const interval90 = testState({live:[ensureAirFields({id:"int90",diverId:"D1",start:`${today}T09:00:00`,mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:01:00`)).checkIntervalMin);
@@ -5485,6 +5566,7 @@
   function resetAllData(){
     try{ [STORAGE_KEY,...LEGACY_STORAGE_KEYS].forEach(k=>localStorage.removeItem(k)); }catch(e){ console.warn(e); }
     state = defaultState();
+    depthConfirmed = {};
   }
   // Zwaardere bevestiging voor de onomkeerbare wis-actie: de gebruiker moet het woord
   // WIS exact overtypen. resetConfirmPhraseOk is de controleerbare grendel; attemptReset
@@ -6074,7 +6156,7 @@
     </div>`;
     document.querySelectorAll("[data-diver-active]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverActive); if(d){ if(!inp.checked && latestActiveDive(d.id)){ alert("Deze duiker heeft nog een actieve duik. Sluit die eerst af voordat je de duiker inactief zet."); d.active=true; } else d.active=!!inp.checked; }}));
     document.querySelectorAll("[data-diver-label]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverLabel); if(d)d.label=cleanDiverLabel(inp.value);}));
-    document.querySelectorAll("[data-diver-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverMdd); if(d){ const raw=parseNum(inp.value); let v=cleanMddValue(inp.value,{clamp:true,fallback:6}); if(Number.isFinite(raw) && raw>MAX_MDD){ alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); } d.defaultMdd=v; inp.value=v; }}));
+    document.querySelectorAll("[data-diver-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverMdd); if(d){ const raw=parseNum(inp.value); let v=cleanMddValue(inp.value,{clamp:true,fallback:6}); if(Number.isFinite(raw) && raw>MAX_MDD){ alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); } d.defaultMdd=v; inp.value=v; depthConfirmed[d.id]=true; }}));
     document.querySelectorAll("[data-diver-sh]").forEach(inp=>inp.onchange=()=>mutate(()=>{const d=state.divers.find(x=>x.id===inp.dataset.diverSh); if(d)d.sh=cleanSignalHolder(inp.value);}));
     const depthToggle=document.getElementById("depthAllToggle"), depthPanel=document.getElementById("depthAllPanel"), depthApply=document.getElementById("depthAllApply"), depthValue=document.getElementById("depthAllValue");
     if(depthToggle && depthPanel){ depthToggle.onclick=()=>{ depthPanel.style.display = depthPanel.style.display==="none" ? "inline-flex" : "none"; if(depthPanel.style.display!=="none") depthValue?.focus(); }; }
