@@ -2,6 +2,25 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.16.0] - 2026-06-24
+
+Een opmaak- en labelronde voor de Duikerstabel op de Instellingen-pagina: kortere kolomkoppen, een gelijkmatige kolomverdeling in portretmodus en een kleiner maar goed aantikbaar Actief-vinkje. De rekenkern en alle registratielagen blijven ongemoeid.
+
+### Gewijzigd
+
+- De kolomkoppen van de Duikerstabel op de Instellingen-pagina zijn korter en eenduidiger: "Aanduiding" wordt "Kenmerk", "Seinhouder" wordt "SH", en de hekjes vervallen bij "Set #" en "Masker #" (nu "Set" en "Masker"). De koppen "Actief", "Duiker" en "MDD" blijven gelijk. Het invoerveld voor het kenmerk krijgt het bijbehorende toegankelijkheidslabel "Kenmerk"; het seinhouderveld houdt bewust het volledige toegankelijkheidslabel "Seinhouder" zodat een schermlezer de betekenis voorleest.
+- De uitleg achter het i-knopje van het Duikers-kaartje benoemt nu expliciet dat de kolom SH de seinhouder is, zodat de korte kop leesbaar blijft. De verwijzing naar "Set en Masker" is taalkundig gelijkgetrokken met de nieuwe koppen. De muted helptekst direct onder de tabel verwijst nu eveneens naar "Kenmerk" in plaats van "Aanduiding", zodat kop en helptekst consistent zijn.
+- De Duikerstabel verdeelt zijn kolommen in portretmodus gelijkmatig. De tabel krijgt hiervoor een eigen scope ("diverstable") met een vaste kolomindeling op de schermweergave, waarbij Actief en Duiker een smalle vaste breedte houden en Kenmerk, SH, MDD, Set en Masker de resterende ruimte gelijk delen. De kopcellen breken niet meer over twee regels; past het echt niet, dan scrollt de tabel horizontaal binnen de bestaande tabelomhulling. Deze opmaak raakt uitsluitend de Duikerstabel en niet de duiklog, de registratie of andere tabellen. Het bestaande printgedrag is niet aangeraakt.
+- Het selectievakje in de Actief-kolom is optisch kleiner gemaakt met behoud van een ruime, goed aantikbare klikzone. Dit geldt alleen voor het Actief-vinkje in deze tabel; andere selectievakjes en invoervelden zijn niet gewijzigd.
+- Appversielabel verhoogd naar v1.16.0; de bijbehorende zelftest controleert mee op v1.16.0. version.json bijgewerkt naar v1.16.0.
+- Het opstart-zelftal gaat van 400 naar 403. De bestaande zelftest die de volledige kop "Seinhouder" eiste is doelbewust herzien naar de nieuwe werkelijkheid (zichtbare kop "SH", betekenis in de uitleg-i) en er zijn drie nieuwe UI-interactietests bijgekomen voor de koppen, de gelijkmatige kolombreedte en de uitleg-i. Elke nieuwe zelftest heeft een tegencontrole tegen tautologie.
+
+### Niet gewijzigd
+
+- Rekenkern, DCIEM-tabellen, rekenbronfingerprint, blokkeerlogica, statussemantiek en validatie zijn niet aangeraakt. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd, evenals het schema en het gedrag van de updatecontrole en de in v1.12.0 vastgelegde plaatsing van de versiemelding.
+- De standaard-MDD (6 m) en de vraag welk veld verplicht is blijven ongewijzigd; dat is een aparte, latere kwestie. De duiksysteem-set blijft gelijk. De naamgeving op andere schermen (duiklog, compacte registratie, CSV-export) is in deze versie bewust niet meegewijzigd; consistentie elders kan een latere ronde zijn.
+- _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.15.0] - 2026-06-23
 
 Twee samenhangende wijzigingen aan de luchtweergave aan de waterkant: de monitor toont voortaan een ademhalingsindicatie (SAC) die de inspanning van de duiker zelf volgt, los van de diepte, en de flesinhoud is instelbaar geworden tussen 2x4 L en 2x6 L.
