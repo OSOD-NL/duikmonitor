@@ -585,7 +585,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.17.0";
+  const APP_VERSION = "v1.18.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -2625,6 +2625,14 @@
     if(validBar(d.airEndBar) != null) return null;
     return d;
   }
+  // De laatste afgesloten duik van deze duiker waarvan de einddruk wel is vastgelegd.
+  // Wordt gebruikt om de begindruk van een volgende duik alvast voor te stellen.
+  // Geen grens- of drempelcontrole hier: dit is een gemak, geen rekenregel.
+  function latestCompletedDiveWithEndBar(diverId){
+    const d = [...state.live].reverse().find(x=>x.diverId===diverId && x.start && x.surface);
+    if(!d) return null;
+    return validBar(d.airEndBar) != null ? d : null;
+  }
   function startLiveDiveFor(diverId, airStartBar){
     const bar = validBar(airStartBar);
     const diver = getDiver(diverId);
@@ -2875,10 +2883,24 @@
     const surfaceDisabled = active ? "" : "disabled";
     const noteOpen = !!openDiverNotes[d.id];
     const noteVal = d.note || "";
+    // Begindruk-voorvulling: als deze duiker nog geen waarde in het invoerveld heeft staan
+    // (geen pendingStartBars) en er een vorige afgesloten duik met vastgelegde einddruk is,
+    // dan tonen we die einddruk als voorstel in het veld, met een zichtbare, overschrijfbare
+    // markering. De duiker hoeft dan niet opnieuw te tikken als het toestel niet is bijgevuld.
+    // Het voorstel is puur visueel: het wordt pas een echte pendingwaarde zodra de gebruiker
+    // het veld aanraakt (zie wireLiveButtons). Het veld blijft volledig overschrijfbaar en er
+    // is bewust geen grens- of drempelcontrole op deze begindruk.
+    const hasPending = Object.prototype.hasOwnProperty.call(pendingStartBars, d.id) && String(pendingStartBars[d.id]).trim() !== "";
+    const prevEndDive = (!active && !hasPending) ? latestCompletedDiveWithEndBar(d.id) : null;
+    const prefillBar = prevEndDive ? Math.round(validBar(prevEndDive.airEndBar)) : null;
+    const startBarValue = hasPending ? pendingStartBars[d.id] : (prefillBar != null ? prefillBar : "");
+    const startBarNote = prefillBar != null
+      ? `<div class="hint small muted" data-start-bar-note="${esc(d.id)}">Voorstel ${esc(fmtBar(prefillBar))} uit einddruk vorige duik. Pas aan als het toestel is bijgevuld.</div>`
+      : "";
     return `<div class="diver-card">
       <h3>${esc(displayDiver(d))} <span class="pill ${s.cls}">${s.txt}</span> <button type="button" class="notepen no-print ${noteVal?'has-note':''}" data-note-toggle="${esc(d.id)}" title="Notitie bij deze duiker" aria-label="Notitie bij deze duiker">✎</button></h3>
       ${noteOpen ? `<div class="noteedit no-print"><textarea aria-label="Notitie" class="user" data-note-input="${esc(d.id)}" placeholder="Notitie bij ${esc(displayDiver(d))}">${esc(noteVal)}</textarea><div class="btnrow"><button class="mini primary" data-note-save="${esc(d.id)}">Bewaren</button></div></div>` : (noteVal ? `<div class="notebox" title="Notitie">✎ ${esc(noteVal)}</div>` : "")}
-      <div class="fieldrow">${active ? "" : `<div class="f12"><label>Begindruk (bar)</label><input aria-label="Begindruk (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-start-bar="${esc(d.id)}" value="${esc(pendingStartBars[d.id] || '')}" placeholder="bijv. 300"></div>`}<div class="f6"><label>MDD</label><input aria-label="MDD" class="user" type="text" inputmode="decimal" data-${active?'active':'default'}-mdd="${esc(active?.id || d.id)}" value="${esc(active ? active.mdd : (d.defaultMdd||6))}"></div><div class="f6"><label>Laatste HG</label><input aria-label="Laatste HG" disabled value="${esc(last?.hgAdjusted||last?.hgRaw||'-')}"></div></div>
+      <div class="fieldrow">${active ? "" : `<div class="f12"><label>Begindruk (bar)</label><input aria-label="Begindruk (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-start-bar="${esc(d.id)}" value="${esc(startBarValue)}" placeholder="bijv. 300">${startBarNote}</div>`}<div class="f6"><label>MDD</label><input aria-label="MDD" class="user" type="text" inputmode="decimal" data-${active?'active':'default'}-mdd="${esc(active?.id || d.id)}" value="${esc(active ? active.mdd : (d.defaultMdd||6))}"></div><div class="f6"><label>Laatste HG</label><input aria-label="Laatste HG" disabled value="${esc(last?.hgAdjusted||last?.hgRaw||'-')}"></div></div>
       <div class="statusline"><span class="pill neutral">Duiken: ${events.length}</span><span class="pill ${active?'live':'neutral'}">${active?'ACTIEF: ja':'Actief: nee'}</span>${events.length ? opkomstBadge({...events[events.length-1], dataset:"live"}) : ""}</div>
       <div class="bigbuttons no-print"><button class="good" data-live-start="${esc(d.id)}" ${startDisabled}>${active?'Duik loopt':'Start duik'}</button><button class="warn" data-live-ascent="${esc(d.id)}" ${ascentDisabled}>${active?.ascentStart?'Opkomst loopt':'Opkomst'}</button><button class="primary fullwidth" data-live-surface="${esc(d.id)}" ${surfaceDisabled}>Boven / einde</button></div>
       ${awaitingEndBar ? `<div class="endbarbox"><div class="endbarhead">Einddruk van het toestel noteren</div><div class="fieldrow"><div class="f8"><label>Einddruk (bar)</label><input aria-label="Einddruk (bar)" class="user" type="number" inputmode="numeric" step="1" min="0" max="330" data-endbar-input="${esc(awaitingEndBar.id)}" value="${esc(pendingEndBars[awaitingEndBar.id] || '')}" placeholder="bijv. 110"></div><div class="f4"><label>&nbsp;</label><button class="primary fullwidth" data-endbar-save="${esc(awaitingEndBar.id)}">Vastleggen</button></div></div></div>` : ""}
@@ -2891,7 +2913,12 @@
     document.querySelectorAll("[data-default-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.divers.find(x=>x.id===inp.dataset.defaultMdd); if(d){ const raw=parseNum(inp.value); const v=cleanMddValue(inp.value,{clamp:true,fallback:6}); if(Number.isFinite(raw) && raw>MAX_MDD) alert("Maximale duikdiepte is 15 m (no-deco tot 15 m). De waarde is teruggezet naar 15."); d.defaultMdd=v; inp.value=v; } }));
     document.querySelectorAll("[data-active-mdd]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.activeMdd); if(d){ const raw=parseNum(inp.value); const v=cleanActualMddValue(inp.value,{fallback:d.mdd||6}); if(Number.isFinite(raw) && raw>MAX_MDD) alert("Let op: diepte boven 15 m ligt buiten de rekenenvelop (no-deco tot 15 m). De waarde wordt als feit geregistreerd; de DCIEM-berekening blokkeert voor deze duik."); d.mdd=v; inp.value=v; if(d.diverId) depthConfirmed[d.diverId]=true; updateAirCheckInterval(d); } }));
     document.querySelectorAll("[data-start-bar]").forEach(inp=>{
-      pendingStartBars[inp.dataset.startBar] = inp.value;
+      // Alleen een al bestaande pendingwaarde overnemen. Een voorgevulde waarde uit de vorige
+      // einddruk (voorvulling) staat wel in het veld, maar mag geen pendingwaarde worden zolang
+      // de gebruiker het veld niet aanraakt; zo blijft het een voorstel en wint eigen invoer.
+      if(Object.prototype.hasOwnProperty.call(pendingStartBars, inp.dataset.startBar)){
+        pendingStartBars[inp.dataset.startBar] = inp.value;
+      }
       inp.oninput = ()=>{ pendingStartBars[inp.dataset.startBar] = inp.value; };
       inp.onchange = ()=>{ const before = inp.value; const cleaned = cleanBarValue(inp.value); if(String(cleaned) !== String(before).trim()){ if(before.trim() !== ""){ alert(`Drukwaarde buiten bereik of ongeldig. Vul een waarde in van 1 t/m ${MAX_BAR} bar.`); } } inp.value = cleaned === "" ? "" : cleaned; pendingStartBars[inp.dataset.startBar] = inp.value; };
     });
@@ -3529,19 +3556,33 @@
     const push=(category,name,expected,actual,ok)=>tests.push({category,name,expected:String(expected),actual:String(actual),ok:!!ok});
     const testState = (custom, fn) => {
       const old = state;
+      // Naast state worden de losse sessie-buffers geisoleerd: een test mag deze buffers
+      // niet naar de live app laten lekken. We bewaren een ondiepe kopie van elke buffer
+      // vooraf en zetten de inhoud na afloop exact terug (zelfde verwijzing, oude sleutels),
+      // zodat een buiten tests legitiem gevulde buffer behouden blijft en binnen de boot-gate
+      // (waar ze leeg zijn) leeg terugkomt.
+      const bufferSnapshot = (buf) => ({buf, copy:{...buf}});
+      const restoreBuffer = (snap) => { for(const k of Object.keys(snap.buf)) delete snap.buf[k]; Object.assign(snap.buf, snap.copy); };
+      const snaps = [
+        bufferSnapshot(pendingStartBars),
+        bufferSnapshot(depthConfirmed),
+        bufferSnapshot(pendingEndBars),
+        bufferSnapshot(pendingAirInputs),
+        bufferSnapshot(pendingAirDepthInputs),
+      ];
       state = defaultState();
       if(custom){ state = {...state, ...custom, project:{...state.project, ...(custom.project||{})}}; ensureDayparts(); ensureProjectMeta(); ensureDivers(); migrateDiveRows(); }
       let result;
       try{ result = fn(); } catch(e){ result = {error:e.message||String(e)}; }
-      state = old;
+      finally{ state = old; for(const s of snaps) restoreBuffer(s); }
       return result;
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.17.0", APP_VERSION, APP_VERSION==="v1.17.0");
+    push("basis","Appversielabel", "v1.18.0", APP_VERSION, APP_VERSION==="v1.18.0");
     // version.json-zelftest (B-0030): controleert dat het veld "version" in het bestand
     // version.json exact gelijk is aan APP_VERSION, zodat een niet-meegeschoven
-    // version.json het zelftal laat zakken en niet stil kan misgaan. De vergeleken waarde
+    // version.json de zelftest laat zakken en niet stil kan misgaan. De vergeleken waarde
     // komt aantoonbaar uit het bestand version.json, niet uit een JS-constante: in de
     // Node-runner draait de in-page code in een verzegelde vm-context zonder fs/fetch, dus
     // scripts/run-selftests-node.js leest version.json van schijf en injecteert de ruwe
@@ -3843,6 +3884,124 @@
       push("ui","Punt 7 (negatieve controle): bevestigingsgrendel accepteert alleen exact WIS",
         "WIS=ok; wis/leeg/spatie=nee", `WIS=${resetConfirmPhraseOk("WIS")?'ok':'nee'}; wis=${resetConfirmPhraseOk("wis")?'ok':'nee'}; leeg=${resetConfirmPhraseOk("")?'ok':'nee'}; spatie=${resetConfirmPhraseOk(" WIS ")?'ok':'nee'}`,
         resetConfirmPhraseOk("WIS")===true && resetConfirmPhraseOk("wis")===false && resetConfirmPhraseOk("")===false && resetConfirmPhraseOk(" WIS ")===true);
+    })();
+    // ===== v1.18.0 UI-interactietests (B-0024): begindruk-voorvulling bij vervolgduik =====
+    // Bij een niet-actieve duiker met een eerder afgesloten duik met geldige einddruk vult de
+    // app het begindruk-veld van de volgende duik alvast met die einddruk, zichtbaar gemarkeerd
+    // en overschrijfbaar. Het is een invoergemak; er komt GEEN controle, grens of waarschuwing
+    // op de hoogte van de begindruk bij. De toetsen draaien op de GERENDERDE HTML
+    // (renderLiveDiver) plus de toestandslaag (pendingStartBars), zelfde idioom als de
+    // v1.13.0 einddruk-toetsen; de Node-mock kent geen getComputedStyle, dus we toetsen de
+    // HTML-string en de buffer, niet de visuele styling. Dat wordt zo in het rapport benoemd.
+    (function(){
+      const baseDiver = {id:"D1",code:"D1",label:"",active:true,defaultMdd:6};
+      const afgerondMetEind = (eind) => ensureAirFields({id:"v118a",diverId:"D1",entryMode:"live",registrationType:"normal",dtMode:"auto",start:`${today}T09:00:00`,surface:`${today}T09:20:00`,mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300,airEndBar:eind});
+      const clearPending = () => { for(const k of Object.keys(pendingStartBars)) delete pendingStartBars[k]; };
+      // (a) afgeronde duik met einddruk 90: veld voorgevuld met 90 plus zichtbare markering,
+      // en de helper levert diezelfde 90.
+      const a = testState({divers:[baseDiver], live:[afgerondMetEind(90)]},()=>{
+        clearPending();
+        const calc = calcDataset("live");
+        const html = renderLiveDiver(getDiver("D1"), calc);
+        const m = html.match(/data-start-bar="D1"[^>]*value="([^"]*)"/);
+        return {value: m ? m[1] : null, markering: html.includes('data-start-bar-note="D1"'), helper: latestCompletedDiveWithEndBar("D1")?.airEndBar};
+      });
+      push("ui","v1.18.0 (a): vervolgduik krijgt begindruk voorgevuld met de vorige einddruk (90) plus zichtbare markering",
+        "value=90, markering=ja, helper=90",
+        `value=${a.value}, markering=${a.markering?'ja':'nee'}, helper=${a.helper}`,
+        a.value==="90" && a.markering===true && validBar(a.helper)===90);
+      // (b1) verse duiker zonder vorige duik: leeg veld, geen markering, helper geeft niets.
+      const b1 = testState({divers:[baseDiver], live:[]},()=>{
+        clearPending();
+        const calc = calcDataset("live");
+        const html = renderLiveDiver(getDiver("D1"), calc);
+        const m = html.match(/data-start-bar="D1"[^>]*value="([^"]*)"/);
+        return {value: m ? m[1] : null, markering: html.includes('data-start-bar-note="D1"'), helper: latestCompletedDiveWithEndBar("D1")};
+      });
+      push("ui","v1.18.0 (b1): verse duiker zonder vorige duik heeft een leeg begindruk-veld en geen markering",
+        "value=leeg, markering=nee, helper=geen",
+        `value=${b1.value===""?'leeg':b1.value}, markering=${b1.markering?'ja':'nee'}, helper=${b1.helper?'wel':'geen'}`,
+        b1.value==="" && b1.markering===false && b1.helper===null);
+      // (b2) vorige duik afgerond maar zonder geldige einddruk: leeg veld, geen markering.
+      const b2 = testState({divers:[baseDiver], live:[ensureAirFields({id:"v118b2",diverId:"D1",entryMode:"live",start:`${today}T09:00:00`,surface:`${today}T09:20:00`,mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300,airEndBar:""})]},()=>{
+        clearPending();
+        const calc = calcDataset("live");
+        const html = renderLiveDiver(getDiver("D1"), calc);
+        const m = html.match(/data-start-bar="D1"[^>]*value="([^"]*)"/);
+        return {value: m ? m[1] : null, markering: html.includes('data-start-bar-note="D1"'), helper: latestCompletedDiveWithEndBar("D1")};
+      });
+      push("ui","v1.18.0 (b2): vorige duik zonder geldige einddruk geeft geen voorstel en geen markering",
+        "value=leeg, markering=nee, helper=geen",
+        `value=${b2.value===""?'leeg':b2.value}, markering=${b2.markering?'ja':'nee'}, helper=${b2.helper?'wel':'geen'}`,
+        b2.value==="" && b2.markering===false && b2.helper===null);
+      // (c) eigen invoer wint: staat er al een pendingwaarde (de duiker heeft zelf iets
+      // ingetypt), dan blijft die staan en verschijnt GEEN voorstel/markering, ook al is er
+      // een vorige einddruk om over te nemen.
+      const c = testState({divers:[baseDiver], live:[afgerondMetEind(90)]},()=>{
+        clearPending();
+        pendingStartBars["D1"] = "250";
+        const calc = calcDataset("live");
+        const html = renderLiveDiver(getDiver("D1"), calc);
+        const m = html.match(/data-start-bar="D1"[^>]*value="([^"]*)"/);
+        const out = {value: m ? m[1] : null, markering: html.includes('data-start-bar-note="D1"')};
+        clearPending();
+        return out;
+      });
+      push("ui","v1.18.0 (c): eigen ingetypte begindruk (250) wint en onderdrukt het voorstel en de markering",
+        "value=250, markering=nee",
+        `value=${c.value}, markering=${c.markering?'ja':'nee'}`,
+        c.value==="250" && c.markering===false);
+      // Anti-limiet-assertie: de voorvulling voegt GEEN nieuwe grens, drempel, minimum of
+      // maximum op de begindruk toe. De bestaande bereikregel (validBar: 1 t/m MAX_BAR) is
+      // gedrag-identiek: een waarde binnen bereik blijft geldig, 0 en boven MAX_BAR blijven
+      // ongeldig, precies zoals voor deze wijziging. Geen nieuw drempelgedrag rond het voorstel.
+      push("ui","v1.18.0 anti-limiet: begindruk-bereik (1 t/m MAX_BAR) ongewijzigd; voorvulling voegt geen grens toe",
+        "300=geldig, 0=ongeldig, MAX+1=ongeldig",
+        `300=${validBar(300)!=null?'geldig':'ongeldig'}, 0=${validBar(0)!=null?'geldig':'ongeldig'}, MAX+1=${validBar(MAX_BAR+1)!=null?'geldig':'ongeldig'}`,
+        validBar(300)!=null && validBar(0)==null && validBar(MAX_BAR+1)==null);
+    })();
+    // Regressie op het testlek in de sessie-buffers: een test mag geen waarde achterlaten in
+    // de losse buffers, en een wis hoort die buffers leeg te maken. Hieronder drie controles.
+    (function(){
+      const bufNames = ["pendingStartBars","depthConfirmed","pendingEndBars","pendingAirInputs","pendingAirDepthInputs"];
+      const bufs = () => [pendingStartBars, depthConfirmed, pendingEndBars, pendingAirInputs, pendingAirDepthInputs];
+      const totaalSleutels = () => bufs().reduce((n,b)=>n+Object.keys(b).length,0);
+      // (1) Na de begindruk-UI-tests hierboven is de live buffer leeg: geen achtergebleven
+      // "250" of andere restwaarde in pendingStartBars. Dit is de bug die op dev zat.
+      push("ui","v1.18.0 buffer-isolatie: pendingStartBars is leeg na de begindruk-UI-tests (geen achtergebleven 250)",
+        "pendingStartBars leeg (0 sleutels), geen D1",
+        `sleutels=${Object.keys(pendingStartBars).length}, D1=${Object.prototype.hasOwnProperty.call(pendingStartBars,"D1")?String(pendingStartBars["D1"]):"afwezig"}`,
+        Object.keys(pendingStartBars).length===0 && !Object.prototype.hasOwnProperty.call(pendingStartBars,"D1"));
+      // (2) resetAllData leegt pendingStartBars en de andere sessie-buffers. We vullen elke
+      // buffer, roepen resetAllData aan, en bevestigen dat alle buffers daarna leeg zijn.
+      // Dat gebeurt binnen testState zodat een (in de boot-gate lege) live buffer naderhand
+      // exact leeg terugkomt en deze test niets achterlaat.
+      const resetLeegt = testState({}, ()=>{
+        pendingStartBars["D1"] = "250";
+        pendingEndBars["D1"] = "120";
+        pendingAirInputs["D1"] = "1";
+        pendingAirDepthInputs["D1"] = "9";
+        depthConfirmed["D1"] = true;
+        const voor = totaalSleutels();
+        resetAllData();
+        return {voor, na: totaalSleutels(), perBuffer: bufs().map(b=>Object.keys(b).length).join("/")};
+      });
+      push("ui","v1.18.0 wis-buffer: resetAllData leegt pendingStartBars en de overige sessie-buffers",
+        "voor>0, na=0 (alle buffers leeg)",
+        `voor=${resetLeegt.voor}, na=${resetLeegt.na}, perBuffer=${resetLeegt.perBuffer}`,
+        resetLeegt.voor>0 && resetLeegt.na===0);
+      // (3) Invariant op de test-isolatie zelf: een test die elke sessie-buffer vult, laat na
+      // afloop van testState geen enkele waarde achter (testState herstelt de buffers). Dit is
+      // de boot-gate-semantiek: elke zelftest geeft de live buffers schoon terug. We meten de
+      // live buffers voor en na een buffer-vullende testState-aanroep; ze moeten gelijk en in
+      // de boot-gate leeg zijn.
+      const voorIso = totaalSleutels();
+      testState({}, ()=>{ pendingStartBars["Dx"]="1"; pendingEndBars["Dx"]="2"; pendingAirInputs["Dx"]="3"; pendingAirDepthInputs["Dx"]="4"; depthConfirmed["Dx"]=true; return null; });
+      const naIso = totaalSleutels();
+      push("invariant","v1.18.0 sessie-buffer-isolatie: testState laat geen enkele buffer-waarde achter",
+        `live buffers ongewijzigd door test (voor=${voorIso}, na gelijk), in boot-gate leeg`,
+        `voor=${voorIso}, na=${naIso}`,
+        naIso===voorIso);
     })();
     // ===== v1.14.0 UI-interactietests (B-0024) =====
     // Onderdeel 1: het uitleg-i-knopje blijft op zijn plek bij openen. Of de summary bij
@@ -5567,6 +5726,13 @@
     try{ [STORAGE_KEY,...LEGACY_STORAGE_KEYS].forEach(k=>localStorage.removeItem(k)); }catch(e){ console.warn(e); }
     state = defaultState();
     depthConfirmed = {};
+    // Na een wis hoort de app in een volledig schone begintoestand te staan: een
+    // achtergebleven invoervoorstel of tussenbuffer hoort daar niet bij. Leeg daarom ook
+    // de losse sessie-buffers, in lijn met het wissen van depthConfirmed hierboven.
+    for(const k of Object.keys(pendingStartBars)) delete pendingStartBars[k];
+    for(const k of Object.keys(pendingEndBars)) delete pendingEndBars[k];
+    for(const k of Object.keys(pendingAirInputs)) delete pendingAirInputs[k];
+    for(const k of Object.keys(pendingAirDepthInputs)) delete pendingAirDepthInputs[k];
   }
   // Zwaardere bevestiging voor de onomkeerbare wis-actie: de gebruiker moet het woord
   // WIS exact overtypen. resetConfirmPhraseOk is de controleerbare grendel; attemptReset
