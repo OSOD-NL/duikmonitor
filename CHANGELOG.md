@@ -2,6 +2,25 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.18.0] - 2026-06-27
+
+Een klein invoergemak aan de waterkant: bij een vervolgduik van dezelfde duiker stelt de app de begindruk alvast voor op basis van de einddruk van de vorige afgeronde duik. De waarde is zichtbaar gemarkeerd als voorstel en blijft gewoon overschrijfbaar; eigen invoer wint altijd. De rekenkern en alle registratielagen blijven ongemoeid. Tevens hersteld: een opstart-zelftest liet ongemerkt een testwaarde in de begindruk-tussenbuffer achter, waardoor het begindruk-veld van de eerste duiker bij elke start een onbedoelde waarde toonde die met Alles wissen niet verdween. De zelftesthelper isoleert de tussenbuffers nu volledig en Alles wissen leegt ze, zodat de app altijd schoon opstart.
+
+### Toegevoegd
+
+- Bij een niet-actieve duiker met een eerder afgeronde duik met een geldige einddruk wordt het begindruk-veld van de volgende duik alvast gevuld met die einddruk, met een rustige melding onder het veld dat het een voorstel uit de vorige duik is en dat het kan worden aangepast als het toestel is bijgevuld. De voorvulling verschijnt alleen als er daadwerkelijk een waarde over te nemen valt; een verse duiker of een vorige duik zonder geldige einddruk houdt een leeg veld zonder melding. Eigen invoer wint altijd: een zelf ingetypte waarde wordt nooit overschreven door de voorgestelde einddruk, en zodra de gebruiker de voorgestelde waarde wijzigt of leegmaakt verdwijnt de markering. De waarde gaat bij Start duik mee via het bestaande pad. Er is bewust geen controle, minimum, maximum, drempel of waarschuwing op de hoogte van de begindruk toegevoegd; de bestaande bereikafhandeling (1 t/m de bovengrens) is gedrag-identiek. Vijf UI-interactietests met tegencontrole borgen dit gedrag, inclusief een anti-limiet-controle dat er geen grenswaarde rond de voorvulling is ontstaan.
+
+### Gewijzigd
+
+- Appversielabel verhoogd naar v1.18.0; de bijbehorende zelftest controleert mee op v1.18.0. version.json bijgewerkt naar v1.18.0.
+- De zelftesthelper herstelt voortaan naast de werktoestand ook de losse invoer-tussenbuffers, zodat geen enkele zelftest een waarde in die buffers kan achterlaten en de app schoon opstart. De begindruk-UI-test die een eigen waarde zette ruimt die nu bovendien zelf op.
+- Alles wissen leegt voortaan ook de invoer-tussenbuffers (begindruk, einddruk en de luchtinvoervelden), zodat na een wis geen achtergebleven voorstel of tussenwaarde blijft staan.
+- Het opstart-zelftest-aantal gaat van 407 naar 415 door de vijf UI-interactietests voor de begindruk-voorvulling en drie aanvullende regressietests met tegencontrole voor de buffer-isolatie en het legen bij Alles wissen.
+
+### Niet gewijzigd
+
+- De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de blokkeerlogica (waaronder de blokkade boven 15 m), het statusmodel en de validatie zijn niet aangeraakt. De einddruk-invoer blijft zoals vastgelegd in v1.17.0 en v1.13.0: bij Boven/einde wordt de einddruk altijd opnieuw uitgevraagd en wordt een meting-op-diepte nooit stil als einddruk overgenomen; deze versie raakt uitsluitend de begindruk van een volgende duik. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd, evenals het schema, de updatecontrole en de plaatsing van de versiemelding. Er is geen controle of grenswaarde op de begindruk toegevoegd. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.17.0] - 2026-06-24
 
 Een attente diepte-bevestiging bij het starten van een live-duik aan de waterkant. Net als de begindruk wordt nu ook de diepte op het juiste moment eenmalig bevestigd, zodat een duik niet ongemerkt op een onaangeraakte standaarddiepte start. Het blijft een bevestiging, geen blokkade: via OK kan altijd worden doorgegaan. De rekenkern, de blokkeerlogica en alle registratielagen blijven ongemoeid.
