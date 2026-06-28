@@ -64,7 +64,7 @@
       --surface-header:rgba(15,23,42,.96);
       --surface-bottom:rgba(15,23,42,.97);
       --surface-navbtn:#111827;
-      --surface-hint-info:var(--surface-soft-hi);
+      --surface-hint-info:#1e293b;
 
       --line-soft:rgba(148,163,184,.22);
       --line-mid:rgba(148,163,184,.26);
@@ -585,7 +585,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.18.0";
+  const APP_VERSION = "v1.19.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -2411,7 +2411,7 @@
       return `<tr><td>${i+1}</td><td>${esc(displayDiver(diver))}</td><td>${depth!=null?esc(fmtDec(depth,1))+" m":"-"}</td><td>${esc(daypartLabel(d.daypart))}</td><td>${esc(ruleLabel)}</td><td>${esc(ruleTime)}</td><td>${planTime!=null?esc(String(planTime))+" min":"-"}</td><td class="mono">${airTxt}</td></tr>`;
     }).join("");
     return `<div class="card span12 werkplan">
-      <div class="headline"><h3>Werkplan (overzicht voor aan de waterkant)</h3><details class="info no-print"><summary title="Uitleg werkplan" aria-label="Uitleg werkplan">i</summary><div class="info-body">Beknopt overzicht van de geplande duiken om over te nemen op papier. De kolom max. tijd toont de meterregellimiet alleen wanneer duikmomenten worden opgeteld; bij losse Tabel 1-duiken toont de kolom de tabelmatige no-deco-limiet waar die beschikbaar is. De luchtkolom L/H is een grove indicatie van het vrije-gasverbruik per minuut bij laag (40 l/min) en hoog (72 l/min) ademtempo op die diepte: ademminuutvolume maal omgevingsdruk. Dit is nadrukkelijk een planningsindicatie, geen limiet en geen vervanging van de drukcheck tijdens de duik.</div></details><button class="ghost no-print" id="printWerkplan">Werkplan printen</button></div>
+      <div class="headline"><h3>Werkplan (overzicht voor aan de waterkant)</h3><details class="info no-print"><summary title="Uitleg werkplan" aria-label="Uitleg werkplan">i</summary><div class="info-body">Beknopt overzicht van de geplande duiken om over te nemen op papier. De kolom max. tijd toont de meterregellimiet alleen wanneer duikmomenten worden opgeteld; bij losse Tabel 1-duiken toont de kolom de tabelmatige no-deco-limiet waar die beschikbaar is. De luchtkolom L/H is een grove indicatie van het vrije-gasverbruik per minuut bij laag (40 l/min) en hoog (72 l/min) ademtempo op die diepte. Het is nadrukkelijk een planningsindicatie, geen limiet en geen vervanging van de drukcheck tijdens de duik.</div></details><button class="ghost no-print" id="printWerkplan">Werkplan printen</button></div>
       <div class="tablewrap"><table class="table"><thead><tr><th>#</th><th>Duiker</th><th>Diepte</th><th>Dagdeel</th><th>Berekening</th><th>Max. tijd</th><th>Geplande DT</th><th title="Indicatief verbruik per minuut: L = 40 l/min, H = 72 l/min">Lucht L/H (l/min)</th></tr></thead><tbody>${rows}</tbody></table></div>
       <p class="small muted no-print">L/H is een indicatie per minuut, geen totaalvoorraad en geen limiet. De duiktijd wordt tijdens de duik bewaakt via de drukcheck, niet via deze indicatie.</p>
     </div>`;
@@ -2588,7 +2588,7 @@
     const liveDivers = visibleDiversForDataset("live");
     document.getElementById("liveScreen").innerHTML = `<div class="grid">
       ${projectBlock()}
-      <div class="card span12 screen-intro"><div class="headline"><h2>Dagregistratie aan de waterkant</h2><details class="info no-print"><summary title="Uitleg Dagregistratie" aria-label="Uitleg Dagregistratie">i</summary><div class="info-body">Vul eerst Begindruk (bar) in. Start duik stempelt daarna de tijd en opent de ademluchtbewaking tot 100 bar. Zodra een duiker boven is, verschijnt de herhalingsduik-vooruitblik: de actuele herhalingsfactor en herhalings-NDL op basis van het lopende oppervlakte-interval, plus de tijdstippen waarop de HF gunstiger wordt tot HF weer 1,0 is. Indicatief; het vervangt de tabel en het DPL-oordeel niet. Met "+ Duiker erbij" activeer je hier het eerstvolgende duikerslot; uitschakelen doe je met het vinkje Actief bij Instellingen.</div></details></div><div class="diver-grid">${liveDivers.map(d=>renderLiveDiver(d, calc)).join("")}</div><div class="btnrow no-print"><button class="ghost no-print" id="addNextDiver"${nextInactiveDiverIndex() < 0 ? " disabled" : ""}>+ Duiker erbij</button></div></div>
+      <div class="card span12 screen-intro"><div class="headline"><h2>Dagregistratie aan de waterkant</h2><details class="info no-print"><summary title="Uitleg Dagregistratie" aria-label="Uitleg Dagregistratie">i</summary><div class="info-body">Vul eerst Begindruk (bar) in. Start duik stempelt daarna de tijd en opent de ademluchtbewaking tot 100 bar. Zodra een duiker boven is, verschijnt de herhalingsduik-vooruitblik: de actuele herhalingsfactor en herhalings-NDL op basis van het lopende oppervlakte-interval, plus de tijdstippen waarop de HF gunstiger wordt tot HF weer 1,0 is. Indicatief; het vervangt de tabel en het DPL-oordeel niet.</div></details></div><div class="diver-grid">${liveDivers.map(d=>renderLiveDiver(d, calc)).join("")}</div><div class="btnrow no-print"><button class="ghost no-print" id="addNextDiver"${nextInactiveDiverIndex() < 0 ? " disabled" : ""}>+ Duiker erbij</button></div></div>
       <div class="card span12"><div class="divehead"><div><div class="headline"><h2>Werkelijke duikregels</h2><details class="info no-print"><summary title="Uitleg Werkelijke duikregels" aria-label="Uitleg Werkelijke duikregels">i</summary><div class="info-body">Achteraf formulier overnemen of live regels corrigeren. Gebruik Registratievorm en Fasen / rolmomenten voor gecombineerde duiken en RD/ResD-wissels.</div></details></div></div><button class="primary no-print" id="addLive" title="Handmatige duikregel toevoegen">+ Regel</button></div>${renderDiveEditor("live", state.live, calc)}</div>
     </div>`;
     wireProject(); wireDiveEditor("live"); wireLiveButtons();
@@ -3579,7 +3579,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.18.0", APP_VERSION, APP_VERSION==="v1.18.0");
+    push("basis","Appversielabel", "v1.19.0", APP_VERSION, APP_VERSION==="v1.19.0");
     // version.json-zelftest (B-0030): controleert dat het veld "version" in het bestand
     // version.json exact gelijk is aan APP_VERSION, zodat een niet-meegeschoven
     // version.json de zelftest laat zakken en niet stil kan misgaan. De vergeleken waarde
@@ -4641,6 +4641,61 @@
     push("thema","Contrastfunctie: zwart op wit = 21:1", "21,00", contrastRatio("#000","#fff").toFixed(2), Math.round(contrastRatio("#000","#fff")*100)/100===21);
     push("thema","blendOver: 50% wit over zwart = grijs 128", "128", String(blendOver("rgba(255,255,255,.5)","#000000").r), blendOver("rgba(255,255,255,.5)","#000000").r===128);
     push("thema","Tokens worden uit de echte stylesheet gelezen", "night-tokens aanwezig", parseThemeTokens("night")["--page-bg"] ? "aanwezig" : "ontbreekt", !!parseThemeTokens("night")["--page-bg"]);
+    // Het uitleg-i-paneel (info-body) moet in nachtmodus een volledig dekkende
+    // achtergrond hebben, zodat inhoud eronder niet doorschijnt. De ruwe tokenwaarde
+    // wordt uit de echte stylesheet gelezen; de asserts falen op de oude waarde
+    // (var(--surface-soft-hi) of een rgba-met-alpha), zodat de toets niet tautologisch is.
+    const nightHintRaw = (parseThemeTokens("night")["--surface-hint-info"] || "").toLowerCase();
+    push("thema","Nacht infovlak is dekkende effen kleur (#1e293b)", "#1e293b", nightHintRaw, nightHintRaw==="#1e293b");
+    push("thema","Nacht infovlak is losgekoppeld van een var-verwijzing", "geen var()", nightHintRaw.includes("var(")?"var-verwijzing":"geen var()", !nightHintRaw.includes("var("));
+    push("thema","Nacht infovlak bevat geen alpha (geen rgba)", "geen rgba", /rgba?\(/.test(nightHintRaw)?"rgba/alpha":"geen rgba", !/rgba?\(/.test(nightHintRaw));
+    const dayHintRaw = (parseThemeTokens("day")["--surface-hint-info"] || "").toLowerCase();
+    push("thema","Dag infovlak ongewijzigd (#f1f5f9)", "#f1f5f9", dayHintRaw, dayHintRaw==="#f1f5f9");
+    // Onderdeel 2 (tekst): twee uitlegteksten zijn ingekort. We lezen de echte paginabron
+    // (Node: __DUIKMONITOR_HTML__, browser: outerHTML), snijden de betreffende info-body uit
+    // op zijn unieke summary-label en toetsen aan- en afwezigheid op die slice, zodat de
+    // toets niet per ongeluk op de knoplabel "+ Duiker erbij" elders in de pagina aanslaat.
+    (function(){
+      function pageSrc(){
+        let s = "";
+        try{ if(typeof __DUIKMONITOR_HTML__ === "string" && __DUIKMONITOR_HTML__) s = __DUIKMONITOR_HTML__; }catch(e){}
+        if(!s){ try{ if(typeof document !== "undefined" && document.documentElement && typeof document.documentElement.outerHTML === "string") s = document.documentElement.outerHTML; }catch(e){} }
+        return s;
+      }
+      // Snijd de info-body die hoort bij een details-blok met een gegeven summary-aria-label.
+      function infoBodyFor(src, ariaLabel){
+        const sumIdx = src.indexOf('aria-label="'+ariaLabel+'"');
+        if(sumIdx < 0) return "";
+        const bodyOpen = src.indexOf('class="info-body"', sumIdx);
+        if(bodyOpen < 0) return "";
+        const contentStart = src.indexOf(">", bodyOpen);
+        const contentEnd = src.indexOf("</div>", contentStart);
+        if(contentStart < 0 || contentEnd < 0) return "";
+        return src.slice(contentStart + 1, contentEnd);
+      }
+      const src = pageSrc();
+      const dag = infoBodyFor(src, "Uitleg Dagregistratie");
+      const werk = infoBodyFor(src, "Uitleg werkplan");
+      const dagGevonden = dag.length > 0;
+      const werkGevonden = werk.length > 0;
+      // Dagregistratie-i: de "+ Duiker erbij"-zin is verwijderd, maar de behouden slotzin staat er nog.
+      const dagZinWeg = dagGevonden && dag.indexOf('Met "+ Duiker erbij" activeer je hier het eerstvolgende duikerslot') < 0;
+      const dagRestStaat = dag.indexOf("het vervangt de tabel en het DPL-oordeel niet") >= 0;
+      push("ui","Dagregistratie-uitleg: + Duiker erbij-zin verwijderd, rest behouden",
+        "zin weg, rest staat", `gevonden=${dagGevonden} zinWeg=${dagZinWeg} rest=${dagRestStaat}`,
+        dagGevonden && dagZinWeg && dagRestStaat);
+      // Werkplan-i: de rekenwijze "ademminuutvolume maal omgevingsdruk" is verwijderd; de
+      // getallen 40/72 l/min en de volledige waarschuwing blijven staan (negatieve controle:
+      // de assert valt als een van de te behouden delen ontbreekt of de rekenwijze nog staat).
+      const werkRekenWeg = werkGevonden && werk.indexOf("ademminuutvolume maal omgevingsdruk") < 0;
+      const houd40 = werk.indexOf("40 l/min") >= 0;
+      const houd72 = werk.indexOf("72 l/min") >= 0;
+      const houdWaarschuwing = werk.indexOf("geen vervanging van de drukcheck") >= 0;
+      push("ui","Werkplan-uitleg: rekenwijze verwijderd, getallen en waarschuwing behouden",
+        "rekenwijze weg; 40/72 l/min en drukcheck-waarschuwing staan",
+        `gevonden=${werkGevonden} rekenWeg=${werkRekenWeg} 40=${houd40} 72=${houd72} waarschuwing=${houdWaarschuwing}`,
+        werkGevonden && werkRekenWeg && houd40 && houd72 && houdWaarschuwing);
+    })();
     const any17Available = exerciseCodeOptions.some(o=>String(o.value).includes("17") || String(o.short).includes("17"));
     push("basis","Oefencode 17 staat niet meer in de keuzelijst", "niet aanwezig", any17Available?"aanwezig":"niet aanwezig", any17Available===false);
     const codeListOk = exerciseCodeOptions.filter(o=>o.value).map(o=>o.value).join(",") === "01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16";
