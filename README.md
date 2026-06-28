@@ -13,7 +13,7 @@ Een eenvoudige, **offline-first** webapplicatie om duiken te plannen, live te mo
 
 ## Status
 
-Actuele publicatieversie: **v1.5.0**. v1.0.0 was de eerste publieke release.
+De actuele publicatieversie staat bij de releases op GitHub; v1.0.0 was de eerste publieke release.
 
 De app plant, monitort en registreert duiken met een gevalideerde DCIEM-rekenmotor tot en met 15 meter, binnen de gedocumenteerde no-deco scope. Ze maakt expliciet onderscheid tussen een losse duik in tabeldiepte 6, 9 of 12 m en een toegepaste 6-, 9- of 12-meterregel waarbij meerdere duikmomenten van dezelfde duiker worden opgeteld. Het duikerbeheer werkt met vaste slots D1 tot en met D12. Alle DCIEM-tabelwaarden zijn cel voor cel tegen de bron gecontroleerd. Bij elke start bewaakt de ingebouwde zelftest zowel de afgeleide rekenmotor als een vaste bronfingerprint/fixture, zodat ook een onbedoelde wijziging in de ingebouwde bron opvalt.
 
