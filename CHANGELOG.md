@@ -2,6 +2,27 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.20.0] - 2026-06-28
+
+De ingebouwde versiemelding is verwijderd. Op de standalone-webapp aan de waterkant had die melding in de praktijk geen waarneembaar nut: een nieuwe versie komt vanzelf binnen wanneer iOS de app uit het geheugen verwijdert en opnieuw laadt, en dat mechanisme blijft ongewijzigd. Doordat de app niet langer het eigen versiebestand hoeft op te halen, gaat de Content-Security-Policy terug naar de strengste stand waarin de app met geen enkele externe of eigen server verbindt. De rekenkern en alle registratielagen blijven ongemoeid.
+
+### Verwijderd
+
+- De versiemelding onderin het scherm en de bijbehorende controle die af en toe bij het eigen domein de nieuwste versie opvroeg, zijn volledig verwijderd, samen met de opmaak en de kleuren die alleen bij die melding hoorden. De live-duik-weergave die bij terugkeren naar de app ververst, blijft volledig werken; alleen de versiecontrole is uit dat terugkeer-moment gehaald.
+- Het losse versiebestand dat de app voor die controle ophaalde, is uit de repository verwijderd en uit de controlegetallen gehaald, zodat het controlegetal nu alleen nog de applicatie zelf dekt.
+- De uitleg "Versiemelding" in het kaartje Privacy en lokaal gebruik is verwijderd, omdat die uitleg niet meer klopt. De overige privacytekst over lokale opslag en het ontbreken van een server blijft ongewijzigd.
+
+### Gewijzigd
+
+- De Content-Security-Policy in de meegeleverde headers zet de verbindingsrichtlijn terug van de eigen oorsprong naar geen enkele verbinding, de strengste stand. Alle andere richtlijnen en headers blijven gelijk. Dit brengt de werkelijke instelling weer in lijn met wat de documentatie op twee plekken al beschrijft.
+- Appversielabel verhoogd naar v1.20.0; de bijbehorende zelftest controleert mee op v1.20.0.
+- De README verwijst voor de actuele publicatieversie nu naar de releases op GitHub in plaats van een vast versienummer dat met elke uitgave veroudert.
+- Het opstart-zelftest-aantal gaat van 421 naar 416. De vijf vervallen controles toetsten uitsluitend de verwijderde versiemelding: de overeenkomst tussen het versiebestand en het versielabel, het verschijnen en herladen van de meldingsbalk, de plaatsing van die balk, de numerieke versievergelijking en de patroongrendel op de opgehaalde waarde. De overige controles blijven niet-tautologisch.
+
+### Niet gewijzigd
+
+- De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de blokkeerlogica (waaronder de blokkade boven 15 m), het statusmodel en de validatie zijn niet aangeraakt. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd, evenals het schema. De boot-verificatie en de geverifieerd/NIET GEVERIFIEERD-badge blijven werken zoals voorheen. De installatiestrook "Zet Duikmonitor op je beginscherm" blijft ongewijzigd. Geen andere richtlijn of header dan de verbindingsrichtlijn is aangepast. site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.19.0] - 2026-06-28
 
 Twee kleine verbeteringen aan de presentatielaag, zonder gevolgen voor de rekenkern of de registratie. In nachtmodus krijgt de opengeklapte uitleg achter een i-knopje voortaan een volledig dekkende achtergrond, zodat velden en tekst eronder er niet meer doorheen schijnen; in dagmodus was dat al zo. Daarnaast zijn twee uitlegteksten ingekort op punten waar ze zichzelf gedeeltelijk herhaalden, zonder informatie te verliezen die nergens anders staat.
