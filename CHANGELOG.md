@@ -4,7 +4,7 @@ Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
 ## [1.22.0] - 2026-06-28
 
-De controle op een onmogelijke ademdrukmeting is verruimd. Tot nu toe gaf de luchtbewaking alleen een melding wanneer de laatste of einddruk hoger was dan de begindruk. Voortaan kijkt de bewaking ook naar de metingen onderling: als een latere meting een hogere druk laat zien dan een eerdere meting, verschijnt een korte controle-melding. Dit is en blijft een waarschuwing, geen drempel, grens of blokkade. De luchtberekening (verbruikstrend, resterende tijd tot 100 bar en de kritieke meldingen) blijft in alle gevallen gewoon doorlopen. Uitvoering van besluit B-0032.
+De controle op een onmogelijke ademdrukmeting is verruimd. Tot nu toe gaf de luchtbewaking alleen een melding wanneer de laatste of einddruk hoger was dan de begindruk. Voortaan kijkt de bewaking ook naar de metingen onderling: als een latere meting een hogere druk laat zien dan een eerdere meting, verschijnt een korte controle-melding. Dit is en blijft een waarschuwing, geen drempel, grens of blokkade. De luchtberekening (verbruikstrend, resterende tijd tot 100 bar en de kritieke meldingen) blijft in alle gevallen gewoon doorlopen.
 
 ### Toegevoegd
 

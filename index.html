@@ -4883,7 +4883,7 @@
     push("lucht","Hogere laatste ademhaling stelt resterend bij", "13 min", `${airSpike.remainingMin} min`, airSpike.remainingMin===13);
     const airOverdue = testState({live:[ensureAirFields({id:"air4",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:270}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:16:00`)));
     push("lucht","Controle na 10 minuten wordt bewaakt", "verlopen", airOverdue.overdue ? "verlopen" : "niet verlopen", airOverdue.overdue===true);
-    // B-0032: een latere ademdrukmeting hoger dan een eerdere geeft een controle-melding,
+    // Drukcontrole: een latere ademdrukmeting hoger dan een eerdere geeft een controle-melding,
     // zonder de luchtbewaking stil te zetten. We voeren de analyse echt uit en toetsen op de
     // teruggegeven messages (niet op een losse hulpfunctie), in beide paden: de live-bewaking
     // (surface nog niet gezet) en de na-duik-samenvatting (surface gezet). De begindruk ligt
@@ -4892,25 +4892,25 @@
     // tussenstijging (150 -> 170).
     const intervalMsg = "Een latere meting is hoger dan een eerdere; controleer invoer.";
     const riseLive = testState({live:[ensureAirFields({id:"riseLive",diverId:"D1",start:`${today}T09:00:00`,ascentStart:"",surface:"",mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:200},{time:`${today}T09:10:00`,bar:150},{time:`${today}T09:15:00`,bar:170}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:15:30`)));
-    push("ui","B-0032 live: tussenmeting hoger dan de vorige geeft de controle-melding",
+    push("ui","Drukcontrole live: tussenmeting hoger dan de vorige geeft de controle-melding",
       "melding aanwezig", riseLive.messages.includes(intervalMsg) ? "melding aanwezig" : "melding afwezig",
       riseLive.messages.includes(intervalMsg)===true);
-    push("ui","B-0032 live: luchtberekening blijft doorlopen bij een onmogelijke stijging",
+    push("ui","Drukcontrole live: luchtberekening blijft doorlopen bij een onmogelijke stijging",
       "rateBarMin en remainingMin aanwezig", `rateBarMin=${riseLive.rateBarMin!=null?'ja':'nee'}, remainingMin=${riseLive.remainingMin!=null?'ja':'nee'}`,
       riseLive.rateBarMin!=null && riseLive.remainingMin!=null);
     const riseSurface = testState({live:[ensureAirFields({id:"riseSurf",diverId:"D1",start:`${today}T09:00:00`,surface:`${today}T09:20:00`,mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:200},{time:`${today}T09:10:00`,bar:150},{time:`${today}T09:15:00`,bar:170}]})]},()=>airStatus(state.live[0]));
-    push("ui","B-0032 na-duik: tussenmeting hoger dan de vorige geeft de controle-melding",
+    push("ui","Drukcontrole na-duik: tussenmeting hoger dan de vorige geeft de controle-melding",
       "melding aanwezig + severity>=1", `melding=${riseSurface.messages.includes(intervalMsg)?'ja':'nee'}, severity=${riseSurface.severity}`,
       riseSurface.messages.includes(intervalMsg)===true && riseSurface.severity>=1);
     // Negatieve controle: een nette dalende reeks 200 -> 150 -> 120 mag de melding NIET geven.
     // Zo faalt de test als de melding onvoorwaardelijk of verkeerd-om zou afgaan; de test is
     // dus geen tautologie. Ook hier blijft de berekening lopen.
     const dropLive = testState({live:[ensureAirFields({id:"dropLive",diverId:"D1",start:`${today}T09:00:00`,ascentStart:"",surface:"",mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:200},{time:`${today}T09:10:00`,bar:150},{time:`${today}T09:15:00`,bar:120}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:15:30`)));
-    push("ui","B-0032 live (negatieve controle): nette dalende reeks geeft de melding niet",
+    push("ui","Drukcontrole live (negatieve controle): nette dalende reeks geeft de melding niet",
       "melding afwezig", dropLive.messages.includes(intervalMsg) ? "melding aanwezig" : "melding afwezig",
       dropLive.messages.includes(intervalMsg)===false);
     const dropSurface = testState({live:[ensureAirFields({id:"dropSurf",diverId:"D1",start:`${today}T09:00:00`,surface:`${today}T09:20:00`,mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:200},{time:`${today}T09:10:00`,bar:150},{time:`${today}T09:15:00`,bar:120}]})]},()=>airStatus(state.live[0]));
-    push("ui","B-0032 na-duik (negatieve controle): nette dalende reeks geeft de melding niet",
+    push("ui","Drukcontrole na-duik (negatieve controle): nette dalende reeks geeft de melding niet",
       "melding afwezig", dropSurface.messages.includes(intervalMsg) ? "melding aanwezig" : "melding afwezig",
       dropSurface.messages.includes(intervalMsg)===false);
     // ---- voorbeeld- en privacytests ----
