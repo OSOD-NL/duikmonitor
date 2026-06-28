@@ -2,6 +2,25 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.21.0] - 2026-06-28
+
+Drie kleine verbeteringen aan de bediening en de weergave aan de waterkant, zonder gevolgen voor de rekenkern of de registratie. De duikerkaartjes op het scherm Dagregistratie krijgen een duidelijke scheidingslijn tussen opeenvolgende kaartjes, zodat ze ook in fel zonlicht beter uit elkaar te houden zijn. Het tabblad Planning vooraf verdwijnt uit de onderste tabbalk; de planningsfunctie en het bijbehorende scherm blijven in hun geheel in de app aanwezig. De verificatiebadge bovenin wordt aantikbaar en opent de releasepagina van het project; kleur, tekst en standen van de badge blijven precies gelijk.
+
+### Toegevoegd
+
+- Tussen twee opeenvolgende duikerkaartjes op het scherm Dagregistratie staat nu een duidelijk zichtbare scheidingslijn. Het eerste kaartje krijgt bewust geen lijn aan de bovenkant; elk volgend kaartje wel. De lijn gebruikt een bestaande themakleur en klopt daardoor automatisch in zowel de dag- als de nachtmodus. De printweergave is niet gewijzigd.
+- De verificatiebadge bovenin is aantikbaar gemaakt en opent de releasepagina van het project in een nieuw tabblad. De badge is bedienbaar met de muis en met het toetsenbord (Enter en spatie) en wordt als koppeling aangeboden. De kleur, de tekst en de drie standen (groen, oranje, rood) van de badge blijven precies gelijk; alleen de aantikbaarheid is toegevoegd.
+
+### Gewijzigd
+
+- Het tabblad Planning vooraf is uit de onderste tabbalk gehaald. De tabbalk toont nu Dagregistratie, Registratie en Instellingen. De planningsfunctie, het planningsscherm, de planningsberekeningen en alle opslag, migratie, import en export blijven volledig ongewijzigd; alleen de tab in de balk vervalt.
+- Appversielabel verhoogd naar v1.21.0; de bijbehorende zelftest controleert mee op v1.21.0.
+- Het opstart-zelftest-aantal gaat van 416 naar 417 door één toegevoegde interactietest die de aantikbare badge nadoet en de gerenderde uitkomst controleert, met een tegencontrole die faalt zodra de aantikbaarheid ontbreekt.
+
+### Niet gewijzigd
+
+- De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de blokkeerlogica (waaronder de blokkade boven 15 m), het statusmodel en de validatie zijn niet aangeraakt. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd, evenals het schema. De boot-verificatie en de standen van de verificatiebadge blijven werken zoals voorheen; alleen de aantikbaarheid is toegevoegd. De planningsberekeningen en het planning-dataspoor zijn volledig behouden. De Content-Security-Policy is ongewijzigd: de externe koppeling opent in een nieuw tabblad en valt buiten de verbindingsrichtlijn. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.20.0] - 2026-06-28
 
 De ingebouwde versiemelding is verwijderd. Op de standalone-webapp aan de waterkant had die melding in de praktijk geen waarneembaar nut: een nieuwe versie komt vanzelf binnen wanneer iOS de app uit het geheugen verwijdert en opnieuw laadt, en dat mechanisme blijft ongewijzigd. Doordat de app niet langer het eigen versiebestand hoeft op te halen, gaat de Content-Security-Policy terug naar de strengste stand waarin de app met geen enkele externe of eigen server verbindt. De rekenkern en alle registratielagen blijven ongemoeid.
