@@ -579,7 +579,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.21.0";
+  const APP_VERSION = "v1.22.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -1737,6 +1737,7 @@
       if(!last) add(1, "Einddruk of laatste luchtmeting ontbreekt.");
       if(last){
         if(startBar != null && last.bar > startBar) add(1, "Laatste/einddruk is hoger dan begindruk.");
+        if(hasRisingPair(ms)) add(1, "Een latere meting is hoger dan een eerdere; controleer invoer.");
         if(last.bar <= AIR_STOP_BAR) add(2, "100 bar bereikt of onderschreden.");
       }
       return {severity, messages};
@@ -2662,6 +2663,19 @@
       .filter(m=>m.time && m.bar != null)
       .sort((a,b)=>a.time-b.time);
   }
+  // Signaleert of de op tijd gesorteerde, op geldige bar gefilterde metingenreeks ergens
+  // een opeenvolgend paar bevat waarbij de latere meting een hogere druk heeft dan de
+  // eerdere. Een ademdrukmeting hoort tijdens een duik niet te stijgen; dit is een
+  // controlesignaal voor de invoer, geen drempel of grens. Eenmalige uitkomst (true/false):
+  // een reeks met meerdere stijgingen levert een enkele samenvattende melding, geen melding
+  // per paar. De luchtberekening verandert hier niet door; dit is uitsluitend een melding.
+  function hasRisingPair(ms){
+    if(!Array.isArray(ms)) return false;
+    for(let i=1;i<ms.length;i++){
+      if(ms[i].bar > ms[i-1].bar) return true;
+    }
+    return false;
+  }
   function addAirMeasurement(d, bar, time=new Date(), depth=""){
     ensureAirFields(d);
     const n = validBar(bar);
@@ -2756,6 +2770,7 @@
     }
     if(!timerNeedsCheck && last){
       if(startBar != null && last.bar > startBar) messages.push("Laatste druk is hoger dan begindruk; controleer invoer.");
+      if(hasRisingPair(ms)) messages.push("Een latere meting is hoger dan een eerdere; controleer invoer.");
       if(last.bar <= AIR_STOP_BAR){ cls="bad"; label="100 bar bereikt"; messages.push("100 bar bereikt of onderschreden."); }
       else if(rateBarMin == null){ cls="warn"; label="Trend onbekend"; messages.push("Nog geen bruikbare verbruikstrend."); }
       else if(remainingMin <= 5){ cls="bad"; label="Lucht kritiek"; messages.push(`Resterend tot 100 bar is ${remainingMin} min.`); }
@@ -3573,7 +3588,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.21.0", APP_VERSION, APP_VERSION==="v1.21.0");
+    push("basis","Appversielabel", "v1.22.0", APP_VERSION, APP_VERSION==="v1.22.0");
     // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
     // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
     // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
@@ -4868,6 +4883,36 @@
     push("lucht","Hogere laatste ademhaling stelt resterend bij", "13 min", `${airSpike.remainingMin} min`, airSpike.remainingMin===13);
     const airOverdue = testState({live:[ensureAirFields({id:"air4",diverId:"D1",start:`${today}T09:00:00`,mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:270}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:16:00`)));
     push("lucht","Controle na 10 minuten wordt bewaakt", "verlopen", airOverdue.overdue ? "verlopen" : "niet verlopen", airOverdue.overdue===true);
+    // B-0032: een latere ademdrukmeting hoger dan een eerdere geeft een controle-melding,
+    // zonder de luchtbewaking stil te zetten. We voeren de analyse echt uit en toetsen op de
+    // teruggegeven messages (niet op een losse hulpfunctie), in beide paden: de live-bewaking
+    // (surface nog niet gezet) en de na-duik-samenvatting (surface gezet). De begindruk ligt
+    // binnen bereik (300) zodat de laatste-tegen-begindruk-melding hier NIET vanzelf afgaat en
+    // we zuiver de onderlinge-stijging-melding meten. Reeks 200 -> 150 -> 170 bevat een echte
+    // tussenstijging (150 -> 170).
+    const intervalMsg = "Een latere meting is hoger dan een eerdere; controleer invoer.";
+    const riseLive = testState({live:[ensureAirFields({id:"riseLive",diverId:"D1",start:`${today}T09:00:00`,ascentStart:"",surface:"",mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:200},{time:`${today}T09:10:00`,bar:150},{time:`${today}T09:15:00`,bar:170}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:15:30`)));
+    push("ui","B-0032 live: tussenmeting hoger dan de vorige geeft de controle-melding",
+      "melding aanwezig", riseLive.messages.includes(intervalMsg) ? "melding aanwezig" : "melding afwezig",
+      riseLive.messages.includes(intervalMsg)===true);
+    push("ui","B-0032 live: luchtberekening blijft doorlopen bij een onmogelijke stijging",
+      "rateBarMin en remainingMin aanwezig", `rateBarMin=${riseLive.rateBarMin!=null?'ja':'nee'}, remainingMin=${riseLive.remainingMin!=null?'ja':'nee'}`,
+      riseLive.rateBarMin!=null && riseLive.remainingMin!=null);
+    const riseSurface = testState({live:[ensureAirFields({id:"riseSurf",diverId:"D1",start:`${today}T09:00:00`,surface:`${today}T09:20:00`,mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:200},{time:`${today}T09:10:00`,bar:150},{time:`${today}T09:15:00`,bar:170}]})]},()=>airStatus(state.live[0]));
+    push("ui","B-0032 na-duik: tussenmeting hoger dan de vorige geeft de controle-melding",
+      "melding aanwezig + severity>=1", `melding=${riseSurface.messages.includes(intervalMsg)?'ja':'nee'}, severity=${riseSurface.severity}`,
+      riseSurface.messages.includes(intervalMsg)===true && riseSurface.severity>=1);
+    // Negatieve controle: een nette dalende reeks 200 -> 150 -> 120 mag de melding NIET geven.
+    // Zo faalt de test als de melding onvoorwaardelijk of verkeerd-om zou afgaan; de test is
+    // dus geen tautologie. Ook hier blijft de berekening lopen.
+    const dropLive = testState({live:[ensureAirFields({id:"dropLive",diverId:"D1",start:`${today}T09:00:00`,ascentStart:"",surface:"",mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:200},{time:`${today}T09:10:00`,bar:150},{time:`${today}T09:15:00`,bar:120}]})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:15:30`)));
+    push("ui","B-0032 live (negatieve controle): nette dalende reeks geeft de melding niet",
+      "melding afwezig", dropLive.messages.includes(intervalMsg) ? "melding aanwezig" : "melding afwezig",
+      dropLive.messages.includes(intervalMsg)===false);
+    const dropSurface = testState({live:[ensureAirFields({id:"dropSurf",diverId:"D1",start:`${today}T09:00:00`,surface:`${today}T09:20:00`,mdd:6,daypart:"1",rule:"auto",notes:"",airStartBar:300,airMeasurements:[{time:`${today}T09:05:00`,bar:200},{time:`${today}T09:10:00`,bar:150},{time:`${today}T09:15:00`,bar:120}]})]},()=>airStatus(state.live[0]));
+    push("ui","B-0032 na-duik (negatieve controle): nette dalende reeks geeft de melding niet",
+      "melding afwezig", dropSurface.messages.includes(intervalMsg) ? "melding aanwezig" : "melding afwezig",
+      dropSurface.messages.includes(intervalMsg)===false);
     // ---- voorbeeld- en privacytests ----
     const ex1 = testState({}, ()=>{ loadExample1(); return {liveCount:state.live.length, codes:state.divers.slice(0,2).map(d=>d.code).join("/"), names:hasPersonName(JSON.stringify(state)), buitenwater:(JSON.stringify(state).toLowerCase().match(/buitenwater/g)||[]).length}; });
     push("voorbeeld","Voorbeeld 1 laadt gecombineerde duikregels (D1/D2)", "≥2 / D1/D2", `${ex1.liveCount} / ${ex1.codes}`, ex1.liveCount>=2 && ex1.codes==="D1/D2");

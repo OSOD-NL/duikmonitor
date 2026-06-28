@@ -2,6 +2,23 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.22.0] - 2026-06-28
+
+De controle op een onmogelijke ademdrukmeting is verruimd. Tot nu toe gaf de luchtbewaking alleen een melding wanneer de laatste of einddruk hoger was dan de begindruk. Voortaan kijkt de bewaking ook naar de metingen onderling: als een latere meting een hogere druk laat zien dan een eerdere meting, verschijnt een korte controle-melding. Dit is en blijft een waarschuwing, geen drempel, grens of blokkade. De luchtberekening (verbruikstrend, resterende tijd tot 100 bar en de kritieke meldingen) blijft in alle gevallen gewoon doorlopen. Uitvoering van besluit B-0032.
+
+### Toegevoegd
+
+- De live-luchtbewaking aan de waterkant en de samenvatting na het boven komen geven nu ook een controle-melding wanneer een latere ademdrukmeting hoger is dan een eerdere meting in dezelfde reeks. De reeks wordt op tijd geordend en op geldige druk gefilterd; bevat zij ergens een stijging tussen twee opeenvolgende metingen, dan volgt een enkele samenvattende melding, niet een melding per paar. De bestaande melding voor een laatste of einddruk hoger dan de begindruk blijft daarnaast bestaan zoals zij was.
+
+### Gewijzigd
+
+- Appversielabel verhoogd naar v1.22.0; de bijbehorende zelftest controleert mee op v1.22.0.
+- Het opstart-zelftest-aantal gaat van 417 naar 422 door vijf toegevoegde interactietests. Twee tests doen een echte metingenreeks met een tussenstijging na en controleren in de teruggegeven meldingen dat de nieuwe controle-melding verschijnt, in zowel de live-bewaking als de samenvatting na het boven komen. Eén test bevestigt dat de luchtberekening bij zo'n stijging blijft doorlopen. Twee tegencontroles met een nette dalende reeks bevestigen dat de melding dan uitblijft, zodat de tests niet vanzelf slagen.
+
+### Niet gewijzigd
+
+- De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de blokkeerlogica (waaronder de blokkade boven 15 m en de grens bij 100 bar), het statusmodel en de validatie zijn niet aangeraakt. De luchtberekening zelf (verbruikstrend, resterende tijd, het ademverbruik per minuut en de bijbehorende meldingen) is ongewijzigd: de verruiming voegt uitsluitend een melding toe en stelt niets uit, maakt niets leeg en blokkeert niets. Er is geen drempel, grens, minimum of maximum op de begindruk of op enige drukmeting toegevoegd; het toegestane drukbereik blijft gelijk. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd, evenals het schema. De boot-verificatie en de standen van de verificatiebadge blijven werken zoals voorheen. De Content-Security-Policy is ongewijzigd. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.21.0] - 2026-06-28
 
 Drie kleine verbeteringen aan de bediening en de weergave aan de waterkant, zonder gevolgen voor de rekenkern of de registratie. De duikerkaartjes op het scherm Dagregistratie krijgen een duidelijke scheidingslijn tussen opeenvolgende kaartjes, zodat ze ook in fel zonlicht beter uit elkaar te houden zijn. Het tabblad Planning vooraf verdwijnt uit de onderste tabbalk; de planningsfunctie en het bijbehorende scherm blijven in hun geheel in de app aanwezig. De verificatiebadge bovenin wordt aantikbaar en opent de releasepagina van het project; kleur, tekst en standen van de badge blijven precies gelijk.
