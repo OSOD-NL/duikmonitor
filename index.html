@@ -405,6 +405,7 @@
     .messages{margin:6px 0 0 0;padding-left:18px;color:var(--text-note)}.messages li{margin:2px 0;font-size:12px;line-height:1.35}
     .diver-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
     .diver-card{border:1px solid var(--line-soft);border-radius:16px;background:var(--surface-soft);padding:12px}
+    .diver-card + .diver-card{border-top:3px solid var(--line-input);margin-top:8px}
     .diver-card h3{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 10px 0;color:var(--text-kpi)}
     .bigbuttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}.bigbuttons button{min-height:52px}.fullwidth{grid-column:1/-1}
     .airbox{margin-top:10px;border:1px solid var(--air-line);border-radius:14px;background:var(--surface-soft-hi);padding:10px}
@@ -578,10 +579,11 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.20.0";
+  const APP_VERSION = "v1.21.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
+  const RELEASES_URL = "https://github.com/OSOD-NL/duikmonitor/releases";
   const OSOD_REPO_URL = "https://github.com/OSOD-NL/OSOD";
   const ISSUE_URL = "https://github.com/OSOD-NL/duikmonitor/issues/new/choose";
   const SECURITY_URL = "https://github.com/OSOD-NL/duikmonitor/security";
@@ -777,7 +779,6 @@
   ];
   const primaryScreens = [
     ["liveScreen", "Dagregistratie"],
-    ["planScreen", "Planning vooraf"],
     ["registrationScreen", "Registratie"],
     ["settingsScreen", "Instellingen"]
   ];
@@ -3572,7 +3573,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.20.0", APP_VERSION, APP_VERSION==="v1.20.0");
+    push("basis","Appversielabel", "v1.21.0", APP_VERSION, APP_VERSION==="v1.21.0");
     // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
     // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
     // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
@@ -3876,6 +3877,86 @@
         `live buffers ongewijzigd door test (voor=${voorIso}, na gelijk), in boot-gate leeg`,
         `voor=${voorIso}, na=${naIso}`,
         naIso===voorIso);
+    })();
+    // ===== v1.21.0 UI-interactietest (B-0024): aantikbare verificatiebadge =====
+    // De badge bovenin wordt elke render door updateVerifyBadge() opnieuw gevuld; de
+    // aantikbaarheid wordt daarom niet daar maar op het vaste element aangehaakt, in de
+    // functie die de globale knoppen elke render veilig opnieuw toewijst. Deze test doet
+    // de echte aanhaking na (de functie die de globale knoppen koppelt) en controleert op
+    // het GERENDERDE element dat er een klik-handler is, dat het element als link/knop
+    // wordt aangeboden (rol, tabindex, cursor) en dat aantikken de doel-URL opent. De
+    // doel-URL wordt gemeten door de browser-open-functie tijdelijk af te vangen.
+    (function(){
+      const badgeEl = (typeof document !== "undefined" && document.getElementById)
+        ? document.getElementById("verifyBadge") : null;
+      if(!badgeEl){
+        push("ui","v1.21.0: badge aantikbaar en opent de releasepagina",
+          "verifyBadge-element aanwezig","verifyBadge ontbreekt",false);
+        return;
+      }
+      const savedOpen = (typeof window !== "undefined") ? window.open : undefined;
+      const savedOnclick = badgeEl.onclick;
+      const savedOnkeydown = badgeEl.onkeydown;
+      const savedRole = badgeEl.getAttribute("role");
+      const savedTabindex = badgeEl.getAttribute("tabindex");
+      const savedCursor = badgeEl.style.cursor;
+      const savedClass = badgeEl.className;
+      const detail = [];
+      let alleOk = true;
+      try {
+        let geopend = null;
+        if(typeof window !== "undefined"){
+          window.open = (url, target, features) => { geopend = {url, target, features}; return null; };
+        }
+        // Echte aanhaking nadoen zoals bij een render.
+        wireGlobalButtons();
+        const heeftKlik = typeof badgeEl.onclick === "function";
+        const rolOk = badgeEl.getAttribute("role") === "link";
+        const tabindexOk = badgeEl.getAttribute("tabindex") === "0";
+        const cursorOk = badgeEl.style.cursor === "pointer";
+        // Klik echt uitvoeren; meet de doorgegeven URL en de veilige opties.
+        if(typeof badgeEl.onclick === "function") badgeEl.onclick();
+        const urlOk = !!geopend && geopend.url === RELEASES_URL && geopend.url === "https://github.com/OSOD-NL/duikmonitor/releases";
+        const veiligOk = !!geopend && typeof geopend.features === "string" && geopend.features.includes("noopener") && geopend.features.includes("noreferrer");
+        // Toetsenbordbediening: Enter opent dezelfde URL.
+        geopend = null;
+        let toetsOk = false;
+        if(typeof badgeEl.onkeydown === "function"){
+          badgeEl.onkeydown({ key:"Enter", preventDefault(){} });
+          toetsOk = !!geopend && geopend.url === RELEASES_URL;
+        }
+        // Kleurklassen ongemoeid: de aanhaking voegt geen kleurklasse toe of weg.
+        const kleurOk = badgeEl.className === savedClass;
+        detail.push(`klik=${heeftKlik} rol=${rolOk} tabindex=${tabindexOk} cursor=${cursorOk} url=${urlOk} veilig=${veiligOk} toets=${toetsOk} kleur=${kleurOk}`);
+        alleOk = heeftKlik && rolOk && tabindexOk && cursorOk && urlOk && veiligOk && toetsOk && kleurOk;
+        // Negatieve controle (anti-tautologie): dezelfde assertie op een vers, NIET aangehaakt
+        // element MOET onwaar zijn. Een vers element heeft geen klik-handler, geen rol en geen
+        // tabindex; als de assertie daarop toch zou slagen, toetst zij niets. Zo blijft het
+        // echte badge-element ongemoeid en is geen removeAttribute nodig.
+        const kaal = document.createElement("span");
+        const negKlik = typeof kaal.onclick === "function";
+        const negRol = kaal.getAttribute("role") === "link";
+        const negTabindex = kaal.getAttribute("tabindex") === "0";
+        const negAanhaking = negKlik && negRol && negTabindex;
+        detail.push(`neg[aanhaking=${negAanhaking}]`);
+        // De negatieve controle slaagt als het verse element niet aangehaakt is (negAanhaking=false).
+        alleOk = alleOk && (negAanhaking === false);
+      } catch(e){
+        alleOk = false;
+        detail.push("uitzondering: " + (e && e.message ? e.message : String(e)));
+      } finally {
+        if(typeof window !== "undefined" && savedOpen !== undefined) window.open = savedOpen;
+        badgeEl.onclick = savedOnclick;
+        badgeEl.onkeydown = savedOnkeydown;
+        if(savedRole === null){ if(badgeEl.removeAttribute) badgeEl.removeAttribute("role"); } else badgeEl.setAttribute("role", savedRole);
+        if(savedTabindex === null){ if(badgeEl.removeAttribute) badgeEl.removeAttribute("tabindex"); } else badgeEl.setAttribute("tabindex", savedTabindex);
+        badgeEl.style.cursor = savedCursor;
+        badgeEl.className = savedClass;
+      }
+      push("ui","v1.21.0: verificatiebadge is aantikbaar (rol/tabindex/cursor), opent de releasepagina veilig in een nieuw tabblad via toets en klik, en laat de kleurklassen ongemoeid",
+        "klik+rol+tabindex+cursor+url+veilig+toets+kleur ja; zonder aanhaking faalt de check",
+        detail.join(" "),
+        alleOk);
     })();
     // ===== v1.14.0 UI-interactietests (B-0024) =====
     // Onderdeel 1: het uitleg-i-knopje blijft op zijn plek bij openen. Of de summary bij
@@ -6227,6 +6308,15 @@
     document.querySelectorAll("[data-export-registration-csv]").forEach(b=>b.onclick=exportRegistrationCsv);
     document.querySelectorAll("[data-export-registration-xlsx]").forEach(b=>b.onclick=exportRegistrationXlsx);
     document.querySelectorAll("[data-print-screen]").forEach(b=>b.onclick=()=>printScreen(b.dataset.printScreen));
+    const verifyBadgeEl = document.getElementById("verifyBadge");
+    if(verifyBadgeEl){
+      const openReleases = () => window.open(RELEASES_URL, "_blank", "noopener,noreferrer");
+      verifyBadgeEl.onclick = openReleases;
+      verifyBadgeEl.onkeydown = (e)=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openReleases(); } };
+      verifyBadgeEl.setAttribute("role","link");
+      verifyBadgeEl.setAttribute("tabindex","0");
+      verifyBadgeEl.style.cursor = "pointer";
+    }
   }
   function printScreen(screenId){
     if(screenId === "registrationScreen") renderRegistration();
