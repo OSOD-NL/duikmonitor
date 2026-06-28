@@ -2,6 +2,22 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.19.0] - 2026-06-28
+
+Twee kleine verbeteringen aan de presentatielaag, zonder gevolgen voor de rekenkern of de registratie. In nachtmodus krijgt de opengeklapte uitleg achter een i-knopje voortaan een volledig dekkende achtergrond, zodat velden en tekst eronder er niet meer doorheen schijnen; in dagmodus was dat al zo. Daarnaast zijn twee uitlegteksten ingekort op punten waar ze zichzelf gedeeltelijk herhaalden, zonder informatie te verliezen die nergens anders staat.
+
+### Gewijzigd
+
+- De achtergrond van de opengeklapte uitleg achter een i-knopje is in nachtmodus nu volledig dekkend in plaats van licht doorschijnend, zodat de inhoud eronder niet meer zichtbaar blijft. Alleen deze achtergrondkleur in nachtmodus is aangepast; de plaatsing, de breedte en het toon- en verberggedrag van de uitleg zijn ongewijzigd, en de dag- en printweergave blijven gelijk.
+- De uitleg bij Dagregistratie aan de waterkant is met een zin ingekort. De toelichting bij de knop "+ Duiker erbij" verviel, omdat de knop dat al benoemt en het uitschakelen via het Actief-vinkje al bij de Duikers-uitleg op Instellingen staat. De knop en zijn werking zijn ongewijzigd.
+- De uitleg bij het Werkplan is bij de luchtkolom L/H ingekort: de interne berekeningswijze verviel, terwijl de waarden voor laag en hoog ademtempo (40 en 72 l/min) en de waarschuwing dat het een planningsindicatie is en geen vervanging van de drukcheck tijdens de duik, behouden blijven.
+- Appversielabel verhoogd naar v1.19.0; de bijbehorende zelftest controleert mee op v1.19.0. version.json bijgewerkt naar v1.19.0.
+- Het opstart-zelftest-aantal gaat van 415 naar 421 door drie controles voor de dekkende uitleg-achtergrond in nachtmodus (met tegencontrole op een achtergebleven doorzichtigheid) en twee aanwezigheidscontroles voor de ingekorte uitlegteksten, plus de meegeschoven versielabelcontrole.
+
+### Niet gewijzigd
+
+- De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de blokkeerlogica (waaronder de blokkade boven 15 m), het statusmodel en de validatie zijn niet aangeraakt. De OSOD-recordlaag, de doelvalidator en Export/Import OSOD zijn ongewijzigd, evenals het schema, de updatecontrole en de plaatsing van de versiemelding. De tabvolgorde en de schermen blijven gelijk. De knop "+ Duiker erbij", de Actief-werking en de verplichte velden zijn ongewijzigd. Aan de overige uitlegteksten en aan de plaatsing, breedte en gelaagdheid van de opengeklapte uitleg is niets veranderd. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.18.0] - 2026-06-27
 
 Een klein invoergemak aan de waterkant: bij een vervolgduik van dezelfde duiker stelt de app de begindruk alvast voor op basis van de einddruk van de vorige afgeronde duik. De waarde is zichtbaar gemarkeerd als voorstel en blijft gewoon overschrijfbaar; eigen invoer wint altijd. De rekenkern en alle registratielagen blijven ongemoeid. Tevens hersteld: een opstart-zelftest liet ongemerkt een testwaarde in de begindruk-tussenbuffer achter, waardoor het begindruk-veld van de eerste duiker bij elke start een onbedoelde waarde toonde die met Alles wissen niet verdween. De zelftesthelper isoleert de tussenbuffers nu volledig en Alles wissen leegt ze, zodat de app altijd schoon opstart.
