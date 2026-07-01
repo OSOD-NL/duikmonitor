@@ -2,6 +2,45 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.24.0] - 2026-07-01
+
+De Duikerstabel op Instellingen is op een smal scherm (staande telefoon) beter leesbaar gemaakt. Tot nu toe werden de kolommen op een smal scherm zo ver samengeknepen dat MDD, Set en Masker hun twee cijfers niet meer volledig toonden en Kenmerk en SH onleesbaar werden. Voortaan krijgt de tabel op een smal scherm zijn natuurlijke, ruimere breedte en schuift hij horizontaal binnen zijn eigen kader; elk veld toont zo zijn volledige inhoud en de gebruiker veegt van links naar rechts. Op een breed scherm blijft de weergave ongewijzigd.
+
+### Gewijzigd
+
+- De Duikerstabel op Instellingen krijgt op een smal scherm vaste kolombreedtes in plaats van breedtes in procenten. De twee tekstkolommen (Kenmerk en SH) worden breed genoeg voor leesbare tekst; de drie cijferkolommen (MDD, Set en Masker) worden breed genoeg om hun twee cijfers volledig te tonen. De tabel krijgt daardoor een grotere totale breedte dan een typisch telefoonscherm en schuift horizontaal binnen zijn bestaande kader, in plaats van dat de kolommen worden samengeknepen. De invoervelden vullen hun kolom en worden niet langer tot onleesbaar ingekort. De kolomkoppen blijven op een regel staan.
+- Op een breed scherm (desktop) blijft de Duikerstabel ongewijzigd: de tabel past netjes binnen de breedte en de vaste-breedte-aanpak met horizontaal schuiven geldt daar niet.
+- Appversielabel verhoogd naar v1.24.0; de bijbehorende zelftest controleert mee op v1.24.0.
+- Het opstart-zelftest-aantal gaat van 430 naar 431 door een toegevoegde controle die borgt dat de cijferkolommen op een smal scherm hun minimale breedte houden en dat de tabel in een horizontaal schuifbaar kader staat. Een tegencontrole met te smalle kolommen bevestigt dat de controle niet vanzelf slaagt.
+
+### Niet gewijzigd
+
+- Dit is een weergavewijziging. De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de meterregels, de blokkeerlogica, het statusmodel en de validatie zijn niet aangeraakt. De opbouw van de OSOD-records, de doelvalidator en de OSOD-, JSON- en XLSX-uitvoer zijn ongewijzigd. De invoervelden, hun maximale lengte en hun betekenis blijven gelijk; alleen de breedte waarmee de Duikerstabel op een smal scherm wordt getoond verandert. De overige tabellen in de app zijn niet gewijzigd. De Content-Security-Policy is ongewijzigd. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
+## [1.23.0] - 2026-06-30
+
+De export- en importknoppen op twee schermen zijn opnieuw ingedeeld voor een duidelijke scheiding. Het scherm Dagregistratie is nu het werk- en back-upscherm: gegevens gaan eruit en erin. Het scherm Registratie is het uitvoerscherm naar buiten: alleen exporteren, in drie verwerkbare vormen. De Duikerstabel op Instellingen is beter leesbaar gemaakt op smalle en brede schermen.
+
+### Toegevoegd
+
+- Op het scherm Dagregistratie staat nu een knop Export XLSX. Deze levert de volledige dagregistratie (planning en werkelijk, beide datasets) als XLSX-bestand, met dezelfde inhoud als de eerdere CSV-uitvoer van dit scherm. Het bestand heeft een vette koprij, passende kolombreedtes, een filterregel, een bevroren bovenrij en schrijft zuivere getallen als getal en waarden met een voorloopnul als tekst.
+- Op het scherm Registratie staat nu een knop Export OSOD. Deze levert exact dezelfde gevalideerde OSOD-records als voorheen; bij een ongeldig record blokkeert de export, net als daarvoor. Alleen de knop staat nu op dit scherm.
+
+### Gewijzigd
+
+- De Duikerstabel op Instellingen verdeelt de kolombreedtes opnieuw. De twee tekstkolommen (Kenmerk en SH) krijgen ruime, gelijke breedte; de twee tweecijferige kolommen (Set en Masker) blijven smal. Daardoor blijven de namen op een smal scherm leesbaar, rekken de cijferkolommen op een breed scherm niet onnodig uit en kappen de kolomkoppen niet meer af. De koppen blijven op een regel en de cijferkolommen blijven onderling gelijk uitgelijnd.
+- Het scherm Dagregistratie toont onder Beheer en export nog drie knoppen: Export JSON, Import JSON en Export XLSX. De knoppen Export OSOD, Import OSOD, Export CSV en Print zijn van dit scherm verwijderd.
+- Het scherm Registratie toont in de exportregel nog drie knoppen: Export OSOD, Export XLSX en Export JSON. De knoppen Print en Export CSV zijn van dit scherm verwijderd.
+- De laatste, voor de gebruiker onbereikbare Print/PDF-knop op de printbare duiklogweergave is eveneens verwijderd, samen met het bijbehorende, nergens anders gebruikte printmechanisme. Daarmee staat er geen Print/PDF-knop meer in de bron. De printbare weergave zelf blijft bestaan.
+- Het scherm Registratie blijft uitsluitend uitvoer; er is geen import op dit scherm.
+- Appversielabel verhoogd naar v1.23.0; de bijbehorende zelftest controleert mee op v1.23.0.
+- Het opstart-zelftest-aantal gaat van 422 naar 430. Acht tests bij het verwijderde OSOD-importmechanisme zijn vervallen; dertien interactietests zijn toegevoegd voor de verplaatste en nieuwe knoppen, en drie aanvullende controles horen bij het stil maken van de opstartcontrole en het verwijderen van de laatste Print/PDF-knop. Die tests doen de echte klik na en controleren het opgebouwde bestand en de gerenderde uitvoer, met negatieve controles die bevestigen dat de verwijderde knoppen weg zijn, dat de opstartcontrole geen melding meer toont en dat de tests niet vanzelf slagen.
+- Twee van deze opstartcontroles zijn robuust gemaakt voor een echte browser. Ze steunden nog op hulpmiddelen die alleen in de testomgeving buiten de browser bestaan, waardoor de opstartbadge in de browser twee niet-kritieke meldingen toonde terwijl de app zelf goed werkte. De controles lezen de te controleren gegevens nu via dezelfde interne weg als de app en via de paginabron van de browser, zodat de opstartbadge in de browser geen niet-kritieke meldingen meer toont. De uitvoer, de knoppen en de rekenkern zijn hierbij niet gewijzigd; alleen de controles zelf.
+
+### Niet gewijzigd
+
+- De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de meterregels, de blokkeerlogica, het statusmodel en de validatie zijn niet aangeraakt. De opbouw van de OSOD-records, de doelvalidator en de inhoud van de OSOD-, JSON- en XLSX-uitvoer blijven inhoudelijk identiek; alleen de knoppen verplaatsen, verschijnen of verdwijnen. De verplaatste OSOD-uitvoer is gelijk aan de vorige en de XLSX van de dagregistratie bevat dezelfde gegevens als de eerdere CSV van dat scherm. De OSOD-export blokkeert nog steeds bij een ongeldig record, met dezelfde melding; alleen de bijbehorende opstartcontrole is zo aangepast dat zij die melding bij het opstarten niet meer zichtbaar maakt. De Content-Security-Policy is ongewijzigd. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.22.0] - 2026-06-28
 
 De controle op een onmogelijke ademdrukmeting is verruimd. Tot nu toe gaf de luchtbewaking alleen een melding wanneer de laatste of einddruk hoger was dan de begindruk. Voortaan kijkt de bewaking ook naar de metingen onderling: als een latere meting een hogere druk laat zien dan een eerdere meting, verschijnt een korte controle-melding. Dit is en blijft een waarschuwing, geen drempel, grens of blokkade. De luchtberekening (verbruikstrend, resterende tijd tot 100 bar en de kritieke meldingen) blijft in alle gevallen gewoon doorlopen.

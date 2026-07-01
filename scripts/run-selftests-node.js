@@ -46,6 +46,8 @@ class MockElement {
   setAttribute(name, value){ this[name] = value; }
   getAttribute(name){ return this[name]; }
   remove(){ }
+  get outerHTML(){ return typeof this._outerHTML === 'string' ? this._outerHTML : ''; }
+  set outerHTML(value){ this._outerHTML = String(value ?? ''); }
 }
 
 const elements = new Map();
@@ -76,6 +78,12 @@ const document = {
 
 document.documentElement.classList = new MockClassList();
 document.documentElement.style = {};
+// Een echte browser stelt de paginabron beschikbaar via document.documentElement.outerHTML.
+// De harness doet dat ook, zodat tests die de bron via de browser-weg (outerHTML) lezen in
+// Node net zo werken als in een browser. De Node-only injectievariabele wordt bewust NIET
+// meer aangeboden (zie context hieronder), zodat een test zonder browser-weg hier omvalt
+// in plaats van pas in een echte browser.
+document.documentElement.outerHTML = html;
 
 document.body.classList = new MockClassList();
 
@@ -94,15 +102,28 @@ const context = {
   window: {},
   navigator: { userAgent: 'node-selftest' },
   __DUIKMONITOR_CSS__: (html.match(/<style>([\s\S]*?)<\/style>/i) || [,''])[1],
-  __DUIKMONITOR_HTML__: html,
-  Blob: class Blob { constructor(parts, opts){ this.parts = parts; this.opts = opts; } },
+  // De Node-only injectievariabele __DUIKMONITOR_HTML__ wordt bewust weggelaten: een echte
+  // browser heeft die niet. Tests die de paginabron nodig hebben, moeten daardoor de
+  // browser-weg (document.documentElement.outerHTML) gebruiken, die de harness hierboven
+  // beschikbaar stelt. Zo valt een test zonder browser-weg al in Node om, niet pas in de browser.
+  Blob: class Blob {
+    // Een echte browser-Blob biedt GEEN publieke .parts; de inhoud is alleen asynchroon
+    // leesbaar. De harness bewaart de bytes intern onder een niet-publieke naam en stelt
+    // .parts niet beschikbaar, zodat elke test die op .parts leunt in Node meteen faalt,
+    // net als in een echte browser.
+    constructor(parts, opts){ this._bytes = parts; this._opts = opts; }
+  },
   URL: { createObjectURL(){ return 'blob:mock'; }, revokeObjectURL(){} },
   setTimeout(fn){ return 0; },
   clearTimeout(){},
   setInterval(){ return 0; },
   clearInterval(){},
-  alert(msg){ throw new Error(`alert: ${msg}`); },
+  // alert/confirm/prompt gedragen zich als in een browser: ze tonen/retourneren en gooien
+  // GEEN exception. Zo valt een test die op een gooiende alert-mock leunde in Node om in
+  // plaats van kunstmatig groen te blijven.
+  alert(msg){ return undefined; },
   confirm(){ return true; },
+  prompt(){ return ''; },
   AudioContext: null,
   webkitAudioContext: null
 };
