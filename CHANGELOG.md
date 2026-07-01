@@ -2,6 +2,24 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.25.0] - 2026-07-01
+
+Twee kleine bedieningsverbeteringen. De cijferkolommen van de Duikerstabel op Instellingen tonen op een smal scherm (staande telefoon) voortaan altijd twee cijfers, en de knop "Boven / einde" bij een lopende duik vraagt eerst een korte bevestiging voordat de duik wordt afgesloten.
+
+### Toegevoegd
+
+- De knop "Boven / einde" bij een lopende duik vraagt nu eerst om bevestiging. Bij bevestigen wordt de duik op boven gezet en verschijnt zoals voorheen de vraag om de einddruk van het toestel te noteren. Bij annuleren gebeurt er niets en blijft de duik gewoon doorlopen. Elke tik vraagt opnieuw, zodat een duik niet meer per ongeluk met een enkele tik wordt beeindigd. De knoppen Start duik en Opkomst blijven ongewijzigd.
+
+### Gewijzigd
+
+- De drie cijferkolommen van de Duikerstabel op Instellingen (MDD, Set en Masker) worden op een smal scherm breder, zodat er altijd twee cijfers in passen. De tabel wordt daardoor iets breder dan een smal telefoonscherm en schuift horizontaal binnen zijn bestaande kader; de gebruiker veegt van links naar rechts. Op een breed scherm blijft de Duikerstabel ongewijzigd.
+- Appversielabel verhoogd naar v1.25.0; de bijbehorende zelftest controleert mee op v1.25.0.
+- Het opstart-zelftest-aantal gaat van 431 naar 433 door twee toegevoegde controles bij de nieuwe bevestiging op "Boven / einde": een controle bevestigt dat annuleren de duik laat doorlopen en een tweede dat bevestigen de duik afsluit en de vraag om de einddruk toont. Beide doen de handeling echt na en controleren de uitkomst, met een tegenbewijs dat zonder de nieuwe bevestiging de annuleer-controle faalt. De bestaande breedtecontrole voor de cijferkolommen is niet in aantal gewijzigd, maar bewaakt nu de strengere ondergrens die twee cijfers zichtbaar houdt.
+
+### Niet gewijzigd
+
+- Dit zijn bedienings- en weergavewijzigingen. De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de meterregels, de blokkeerlogica, het statusmodel en de validatie zijn niet aangeraakt. De luchtbewaking, de drukmeldingen, de SAC-weergave en de blokkade boven 15 m blijven gelijk. De opbouw van de OSOD-records, de doelvalidator en de OSOD-, JSON- en XLSX-uitvoer blijven inhoudelijk en veld-identiek. De diepte-bevestiging bij de start en het begindruk-pad blijven ongewijzigd. De brede-scherm-weergave van de Duikerstabel, de koppen, de veldinhoud en de maximale lengte van de velden blijven gelijk. De Content-Security-Policy is ongewijzigd. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.24.0] - 2026-07-01
 
 De Duikerstabel op Instellingen is op een smal scherm (staande telefoon) beter leesbaar gemaakt. Tot nu toe werden de kolommen op een smal scherm zo ver samengeknepen dat MDD, Set en Masker hun twee cijfers niet meer volledig toonden en Kenmerk en SH onleesbaar werden. Voortaan krijgt de tabel op een smal scherm zijn natuurlijke, ruimere breedte en schuift hij horizontaal binnen zijn eigen kader; elk veld toont zo zijn volledige inhoud en de gebruiker veegt van links naar rechts. Op een breed scherm blijft de weergave ongewijzigd.

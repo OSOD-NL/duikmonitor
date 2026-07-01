@@ -500,12 +500,12 @@
       input,select,textarea{font-size:16px!important;line-height:1.25!important;}
       input[type="time"],input[type="number"],input[type="text"],select,textarea{min-height:44px;}
       .tablewrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-      .table.diverstable{table-layout:auto;min-width:520px}
+      .table.diverstable{table-layout:auto;min-width:544px}
       .table.diverstable col.divers-kenmerk{width:104px}
       .table.diverstable col.divers-sh{width:104px}
-      .table.diverstable col.divers-mdd{width:52px}
-      .table.diverstable col.divers-set{width:52px}
-      .table.diverstable col.divers-mask{width:52px}
+      .table.diverstable col.divers-mdd{width:72px}
+      .table.diverstable col.divers-set{width:72px}
+      .table.diverstable col.divers-mask{width:72px}
       .table.diverstable td input.user{max-width:none;width:100%;box-sizing:border-box}
       .bottomnav button{flex:0 0 auto;min-width:92px;padding:8px 8px;font-size:11px;min-height:44px;border-radius:12px;background:var(--surface-navbtn);color:var(--text-main);white-space:nowrap}
       .bottomnav button.active{background:var(--tab-active-bg);color:var(--tab-active-text);border-color:var(--tab-active-border)}
@@ -588,7 +588,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.24.0";
+  const APP_VERSION = "v1.25.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -1211,6 +1211,7 @@
   // deze functie maar op de markering en een meegegeven bevestiger, in de lijn van
   // resetConfirmPhraseOk/attemptReset.
   let confirmDepthFn = (mddVal) => confirm(`Diepte voor deze duik is ${mddVal} m. Klopt dat?`);
+  let confirmSurfaceFn = () => confirm("Duik van deze duiker beeindigen? De duik wordt op boven gezet.");
   let pendingAirInputs = {};
   let pendingAirDepthInputs = {};
   let pendingEndBars = {};
@@ -2657,6 +2658,17 @@
     if(ask(mddVal)){ depthConfirmed[diverId] = true; return true; }
     return false;
   }
+  // Bevestiging bij het beeindigen van een lopende duik (knop "Boven / einde"). Pure
+  // grendel zonder DOM en zonder eigen popup-afhankelijkheid, zodat de zelftest hem met
+  // een injecteerbare bevestiger kan aansturen. Anders dan de start-bevestiging is dit
+  // geen eenmalig onderdrukte markering: elke tik vraagt opnieuw, want een afronding
+  // hoort geen "al bevestigd"-status te dragen. Is er geen lopende duik voor deze
+  // duiker, dan valt er niets te beeindigen en gaat de grendel dicht (false).
+  function confirmSurface(diverId, confirmer){
+    if(!latestActiveDive(diverId)) return false;
+    const ask = typeof confirmer === "function" ? confirmer : confirmSurfaceFn;
+    return ask(diverId) === true;
+  }
   function validBar(value){
     const n = parseNum(value);
     return Number.isFinite(n) && n > 0 && n <= MAX_BAR ? n : null;
@@ -2954,7 +2966,7 @@
       mutate(()=>{ if(startLiveDiveFor(diverId, n)) delete pendingStartBars[diverId]; });
     });
     document.querySelectorAll("[data-live-ascent]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=latestActiveDive(btn.dataset.liveAscent); if(d && !d.ascentStart) stampField(d, "ascentStart", new Date()); }); });
-    document.querySelectorAll("[data-live-surface]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; mutate(()=>{ const d=latestActiveDive(btn.dataset.liveSurface); if(d){ const now=new Date(); stampField(d, "surface", now); ensureOsodIdentity(d); } }); });
+    document.querySelectorAll("[data-live-surface]").forEach(btn=>btn.onclick=()=>{ if(btn.disabled) return; if(!confirmSurface(btn.dataset.liveSurface)) return; mutate(()=>{ const d=latestActiveDive(btn.dataset.liveSurface); if(d){ const now=new Date(); stampField(d, "surface", now); ensureOsodIdentity(d); } }); });
     document.querySelectorAll("[data-air-start]").forEach(inp=>inp.onchange=()=>mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.airStart); if(d){ ensureAirFields(d); d.airStartBar = cleanBarValue(inp.value); inp.value = d.airStartBar; } }));
     document.querySelectorAll("[data-air-start-correct]").forEach(inp=>inp.onchange=()=>{ const before = inp.value; const cleaned = cleanBarValue(inp.value); if(String(cleaned) !== String(before).trim() && before.trim() !== ""){ alert(`Drukwaarde buiten bereik of ongeldig. Vul een waarde in van 1 t/m ${MAX_BAR} bar.`); } mutate(()=>{ const d=state.live.find(x=>x.id===inp.dataset.airStartCorrect); if(d){ ensureAirFields(d); d.airStartBar = cleaned; inp.value = d.airStartBar; } }); });
     document.querySelectorAll("[data-air-input]").forEach(inp=>{
@@ -3479,7 +3491,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.24.0", APP_VERSION, APP_VERSION==="v1.24.0");
+    push("basis","Appversielabel", "v1.25.0", APP_VERSION, APP_VERSION==="v1.25.0");
     // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
     // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
     // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
@@ -4208,13 +4220,13 @@
       // Masker) een vaste minimale kolombreedte die twee cijfers kan tonen, en staat de
       // tabel in een scroll-container (overflow-x:auto) met een minimale totale breedte,
       // zodat de gebruiker horizontaal veegt in plaats van dat de kolommen worden
-      // samengeknepen. De ondergrens voor de cijferkolommen is 48 px; de test leest de
+      // samengeknepen. De ondergrens voor de cijferkolommen is 72 px; de test leest de
       // toegekende px-breedte uit de CSS en eist dat elke cijferkolom minstens die
       // ondergrens haalt. Negatieve controle tegen tautologie: een variant met een te
       // smalle kolombreedte (bijvoorbeeld 40 px) MOET de test laten falen.
       (function(){
         const css = diverstableCss();
-        const ONDERGRENS = 48;
+        const ONDERGRENS = 72;
         function kolomBreedte(bron, kolom){
           const m = bron.match(new RegExp("\\.table\\.diverstable col\\.divers-" + kolom + "\\{width:(\\d+)px\\}"));
           return m ? parseInt(m[1], 10) : null;
@@ -4242,8 +4254,8 @@
           + ".table.diverstable col.divers-mask{width:40px}";
         const valsCijfersHalen = cijferkolommenHalen(valsCss, ONDERGRENS);
         const grendelValt = valsCijfersHalen === false;
-        push("ui","Duikerstabel: cijferkolommen minstens 48px en tabel scrollbaar op smal scherm",
-          "MDD/Set/Masker >= 48px, tabel met min-width in scroll-container, negatieve grendel valt",
+        push("ui","Duikerstabel: cijferkolommen minstens 72px en tabel scrollbaar op smal scherm",
+          "MDD/Set/Masker >= 72px, tabel met min-width in scroll-container, negatieve grendel valt",
           `mdd=${mddW} set=${setW} mask=${maskW} cijfers=${cijfersHalen} minbreedte=${tabelHeeftMinBreedte} wrap=${wrapInRender} scroll=${wrapScrollt} scope=${scopeInRender} grendel=${grendelValt}`,
           cijfersHalen && tabelHeeftMinBreedte && wrapInRender && wrapScrollt && scopeInRender && grendelValt);
       })();
@@ -4769,6 +4781,37 @@
       return {gevraagdGezet, magGezet, gevraagdLeeg, magLeeg};
     });
     push("bediening","Diepte-bevestiging: na bewuste diepte-actie geen herhaling, onaangeraakt wel", "gezet niet gevraagd + mag / leeg wel gevraagd", `gezet gevraagd ${geenHerhaling.gevraagdGezet}/mag ${geenHerhaling.magGezet} · leeg gevraagd ${geenHerhaling.gevraagdLeeg}`, geenHerhaling.gevraagdGezet===false && geenHerhaling.magGezet===true && geenHerhaling.gevraagdLeeg===true && geenHerhaling.magLeeg===true);
+    // Eind-bevestiging op "Boven / einde" (v1.25.0). De grendel confirmSurface is puur en
+    // waarde-onafhankelijk; we toetsen hem met een registrerende bevestiger op een lopende
+    // duik (start gezet, nog geen boven). De handeling wordt echt nagedaan via de grendel,
+    // niet alleen een opgeslagen waarde gezet, en we controleren de vervolgstand (blijft de
+    // duik lopen of verschijnt het einddruk-blok) op de datalaag die de render voedt.
+    // 1. Annuleren: de bevestiger geeft false. De duik wordt NIET beeindigd en blijft
+    //    actief. Negatieve controle tegen tautologie: de bevestiger MOET aantoonbaar zijn
+    //    aangeroepen (gevraagd true), anders faalt de test.
+    const eindAnnuleer = testState({divers:[{id:"D1",label:"",defaultMdd:9}],live:[ensureAirFields({id:"eindA",diverId:"D1",start:`${today}T09:00:00`,surface:"",mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300})]},()=>{
+      let gevraagd=false;
+      const annuleer=(id)=>{ gevraagd=true; return false; };
+      const mag=confirmSurface("D1", annuleer);
+      if(mag){ const d=latestActiveDive("D1"); if(d){ stampField(d,"surface",new Date()); ensureOsodIdentity(d); } }
+      const actief = !!latestActiveDive("D1");
+      const wacht = !!latestDiveAwaitingEndBar("D1");
+      return {gevraagd, mag, actief, wacht};
+    });
+    push("bediening","Eind-bevestiging: Annuleren laat de duik lopen", "gevraagd ja / mag nee / duik actief / geen einddruk-blok", `gevraagd ${eindAnnuleer.gevraagd} / mag ${eindAnnuleer.mag} / actief ${eindAnnuleer.actief} / wacht ${eindAnnuleer.wacht}`, eindAnnuleer.gevraagd===true && eindAnnuleer.mag===false && eindAnnuleer.actief===true && eindAnnuleer.wacht===false);
+    // 2. OK: de bevestiger geeft true. De duik wordt WEL beeindigd (boven gezet), is niet
+    //    meer actief, en de vervolgstap verschijnt: latestDiveAwaitingEndBar levert de duik
+    //    (het einddruk-blok in de render).
+    const eindOk = testState({divers:[{id:"D1",label:"",defaultMdd:9}],live:[ensureAirFields({id:"eindB",diverId:"D1",start:`${today}T09:00:00`,surface:"",mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300})]},()=>{
+      let gevraagd=false;
+      const ok=(id)=>{ gevraagd=true; return true; };
+      const mag=confirmSurface("D1", ok);
+      if(mag){ const d=latestActiveDive("D1"); if(d){ stampField(d,"surface",new Date()); ensureOsodIdentity(d); } }
+      const actief = !!latestActiveDive("D1");
+      const wacht = !!latestDiveAwaitingEndBar("D1");
+      return {gevraagd, mag, actief, wacht};
+    });
+    push("bediening","Eind-bevestiging: OK beeindigt de duik en toont het einddruk-blok", "gevraagd ja / mag ja / niet meer actief / einddruk-blok", `gevraagd ${eindOk.gevraagd} / mag ${eindOk.mag} / actief ${eindOk.actief} / wacht ${eindOk.wacht}`, eindOk.gevraagd===true && eindOk.mag===true && eindOk.actief===false && eindOk.wacht===true);
     const interval89 = testState({live:[ensureAirFields({id:"int89",diverId:"D1",start:`${today}T09:00:00`,mdd:8.9,daypart:"1",rule:"auto",notes:"",airStartBar:300})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:01:00`)).checkIntervalMin);
     push("lucht","Drukcheck bij MDD 8,9 blijft 10 min", "10 min", `${interval89} min`, interval89===10);
     const interval90 = testState({live:[ensureAirFields({id:"int90",diverId:"D1",start:`${today}T09:00:00`,mdd:9,daypart:"1",rule:"auto",notes:"",airStartBar:300})]},()=>airAnalysis(state.live[0], new Date(`${today}T09:01:00`)).checkIntervalMin);
