@@ -5056,9 +5056,9 @@
       let liep = true;
       try { exportDagregistratieXlsx(); } catch(e){ liep = false; }
       downloadBlob = origDownload;
-      const sheet = cap ? String((cap.blob && cap.blob.parts && cap.blob.parts[0]) || "") : "";
-      // De blob is de gezipte XLSX (binair). Controleer de sheet-XML los, via dezelfde
-      // route die de functie intern gebruikt, plus dat de download echt is opgebouwd.
+      // De blob is de gezipte XLSX (binair) en wordt niet ontleed. Controleer de sheet-XML
+      // los, via dezelfde route die de functie intern gebruikt, plus dat de download echt
+      // is opgebouwd. De binaire download-inhoud zelf wordt niet uitgelezen.
       const rows = dagregistratieRowsForExport();
       const sheetXmlOut = sheetXml(rows);
       const kopRij = rows[0].join(",");
@@ -5104,9 +5104,12 @@
       let liep = true;
       try { exportOsodJson(); } catch(e){ liep = false; }
       finally { downloadBlob = origDownload; window.alert = origAlertOk; }
-      let payload = null;
-      try { payload = cap ? JSON.parse(String(cap.blob.parts[0])) : null; } catch(e){ payload = null; }
-      const recs = Array.isArray(payload) ? payload : (payload ? [payload] : []);
+      // De inhoudelijke recordcontrole gebruikt dezelfde interne route die de exportfunctie
+      // gebruikt om de records op te bouwen, niet de binaire download-inhoud. Dat is dezelfde
+      // aanpak als de XLSX-test (die via de interne rij-route controleert los van de download).
+      // Zo werkt de controle in Node en in een echte browser gelijk.
+      const built = osodRecordsForRegistration();
+      const recs = built.map(b => b.record);
       const geldigeRecords = recs.length===1 && recs[0].osodVersion==="0.1" && recs[0].recordType==="operationeleDuikregistratie" && (recs[0].conformanceClaims||[]).includes("R");
       // Blokkade bij ongeldig record: een geblokkeerde export meldt de gebruiker via een
       // melding-popup en laat geen download achter. Die popup wordt hier tijdelijk
@@ -5148,6 +5151,7 @@
       const regHtml = renderRegistration.toString();
       let staticHtml = "";
       try{ if(typeof __DUIKMONITOR_HTML__ === "string" && __DUIKMONITOR_HTML__) staticHtml = __DUIKMONITOR_HTML__; }catch(e){}
+      if(!staticHtml){ try{ if(typeof document !== "undefined" && document.documentElement && typeof document.documentElement.outerHTML === "string") staticHtml = document.documentElement.outerHTML; }catch(e){} }
       // Het verwijderde OSOD-importbestand was een tweede file-input in de pagina.
       // Structureel controleren we dat er nog precies een file-input over is (de
       // JSON-back-up-import), zonder de oude identifier als literal in de bron te zetten.

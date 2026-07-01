@@ -20,6 +20,7 @@ De export- en importknoppen op twee schermen zijn opnieuw ingedeeld voor een dui
 - Het scherm Registratie blijft uitsluitend uitvoer; er is geen import op dit scherm.
 - Appversielabel verhoogd naar v1.23.0; de bijbehorende zelftest controleert mee op v1.23.0.
 - Het opstart-zelftest-aantal gaat van 422 naar 430. Acht tests bij het verwijderde OSOD-importmechanisme zijn vervallen; dertien interactietests zijn toegevoegd voor de verplaatste en nieuwe knoppen, en drie aanvullende controles horen bij het stil maken van de opstartcontrole en het verwijderen van de laatste Print/PDF-knop. Die tests doen de echte klik na en controleren het opgebouwde bestand en de gerenderde uitvoer, met negatieve controles die bevestigen dat de verwijderde knoppen weg zijn, dat de opstartcontrole geen melding meer toont en dat de tests niet vanzelf slagen.
+- Twee van deze opstartcontroles zijn robuust gemaakt voor een echte browser. Ze steunden nog op hulpmiddelen die alleen in de testomgeving buiten de browser bestaan, waardoor de opstartbadge in de browser twee niet-kritieke meldingen toonde terwijl de app zelf goed werkte. De controles lezen de te controleren gegevens nu via dezelfde interne weg als de app en via de paginabron van de browser, zodat de opstartbadge in de browser geen niet-kritieke meldingen meer toont. De uitvoer, de knoppen en de rekenkern zijn hierbij niet gewijzigd; alleen de controles zelf.
 
 ### Niet gewijzigd
 
