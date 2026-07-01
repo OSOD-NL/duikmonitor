@@ -2,6 +2,25 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.26.0] - 2026-07-01
+
+De uitklaphoek op de Dagregistratie is de back-uphoek van de app geworden. De hoek heet nu "Back-up en herstel", de knop Export XLSX is er weggehaald (deze blijft op het scherm Registratie), en er is een knop Plakken bijgekomen waarmee een JSON-back-up rechtstreeks als tekst kan worden teruggezet zonder bestand.
+
+### Toegevoegd
+
+- Op het scherm Dagregistratie staat onder "Back-up en herstel" nu een knop Plakken naast Export JSON en Import JSON. Een tik op Plakken opent een tekstveld waarin een JSON-back-up wordt geplakt, met daaronder een knop Importeren en een knop Sluiten. De import start alleen met de knop Importeren; Enter in het veld maakt gewoon een nieuwe regel. Bij Importeren wordt de geplakte tekst langs precies hetzelfde pad verwerkt als een geimporteerd bestand, met dezelfde controles, dezelfde opschoonmelding bij overgeslagen registraties of opgeschoonde drukwaarden, en dezelfde foutmelding bij onleesbare tekst. Bij een fout blijft het veld open zodat de tekst kan worden gecorrigeerd; bij succes sluit het veld en wordt het veld leeggemaakt. Het gaat uitsluitend om de gewone JSON-back-up, niet om de OSOD-uitvoer.
+
+### Gewijzigd
+
+- De uitklaphoek op de Dagregistratie heet niet langer "Beheer en export" maar "Back-up en herstel". De naam dekt de inhoud: Export JSON maakt een back-up, Import JSON en Plakken zetten er een terug.
+- De knop Export XLSX is van de Dagregistratie-hoek weggehaald. De XLSX-export van dit scherm vervalt daarmee als knop. De XLSX-export op het scherm Registratie blijft ongewijzigd bestaan via de eigen knop daar, en de onderliggende XLSX-opbouw blijft in de app aanwezig.
+- Appversielabel verhoogd naar v1.26.0; de bijbehorende zelftest controleert mee op v1.26.0.
+- Het opstart-zelftest-aantal gaat van 433 naar 438. De bestaande controle bij de weggehaalde XLSX-knop is omgedraaid naar de nieuwe waarheid (de knop hoort er niet meer te staan) terwijl dezelfde controle blijft bewaken dat de XLSX-exportfunctie zelf nog werkt; het aantal daarvan verandert niet. Vijf controles zijn toegevoegd voor de plak-import: een geldige plak levert dezelfde registratie-rijen als een directe import, een geplakt veld draagt aantoonbaar de teruggezette waarde, een onleesbare plak meldt netjes een fout zonder de bestaande gegevens te wijzigen, en twee tegencontroles bevestigen dat een geldige plak de gegevens wel wijzigt zodat de controles niet vanzelf slagen. De controles doen de handeling echt na en gebruiken geen echte klik of melding.
+
+### Niet gewijzigd
+
+- Dit zijn bedienings- en indelingswijzigingen. De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de meterregels, de blokkeerlogica, het statusmodel en de validatie zijn niet aangeraakt. De luchtbewaking, de drukmeldingen en de blokkade boven 15 m blijven gelijk. De verwerking van een geimporteerde back-up is inhoudelijk niet gewijzigd: de plak-import is alleen een tweede invoerbron naar dezelfde functie, met dezelfde whitelist, sanering en begrenzing. De XLSX-exportlogica en de knoppen op het scherm Registratie blijven ongewijzigd. De opbouw van de OSOD-records, de doelvalidator en de OSOD-uitvoer blijven inhoudelijk en veld-identiek; er is geen OSOD-plak. De Content-Security-Policy is ongewijzigd. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.25.0] - 2026-07-01
 
 Twee kleine bedieningsverbeteringen. De cijferkolommen van de Duikerstabel op Instellingen tonen op een smal scherm (staande telefoon) voortaan altijd twee cijfers, en de knop "Boven / einde" bij een lopende duik vraagt eerst een korte bevestiging voordat de duik wordt afgesloten.
