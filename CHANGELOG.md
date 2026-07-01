@@ -2,6 +2,21 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.24.0] - 2026-07-01
+
+De Duikerstabel op Instellingen is op een smal scherm (staande telefoon) beter leesbaar gemaakt. Tot nu toe werden de kolommen op een smal scherm zo ver samengeknepen dat MDD, Set en Masker hun twee cijfers niet meer volledig toonden en Kenmerk en SH onleesbaar werden. Voortaan krijgt de tabel op een smal scherm zijn natuurlijke, ruimere breedte en schuift hij horizontaal binnen zijn eigen kader; elk veld toont zo zijn volledige inhoud en de gebruiker veegt van links naar rechts. Op een breed scherm blijft de weergave ongewijzigd.
+
+### Gewijzigd
+
+- De Duikerstabel op Instellingen krijgt op een smal scherm vaste kolombreedtes in plaats van breedtes in procenten. De twee tekstkolommen (Kenmerk en SH) worden breed genoeg voor leesbare tekst; de drie cijferkolommen (MDD, Set en Masker) worden breed genoeg om hun twee cijfers volledig te tonen. De tabel krijgt daardoor een grotere totale breedte dan een typisch telefoonscherm en schuift horizontaal binnen zijn bestaande kader, in plaats van dat de kolommen worden samengeknepen. De invoervelden vullen hun kolom en worden niet langer tot onleesbaar ingekort. De kolomkoppen blijven op een regel staan.
+- Op een breed scherm (desktop) blijft de Duikerstabel ongewijzigd: de tabel past netjes binnen de breedte en de vaste-breedte-aanpak met horizontaal schuiven geldt daar niet.
+- Appversielabel verhoogd naar v1.24.0; de bijbehorende zelftest controleert mee op v1.24.0.
+- Het opstart-zelftest-aantal gaat van 430 naar 431 door een toegevoegde controle die borgt dat de cijferkolommen op een smal scherm hun minimale breedte houden en dat de tabel in een horizontaal schuifbaar kader staat. Een tegencontrole met te smalle kolommen bevestigt dat de controle niet vanzelf slaagt.
+
+### Niet gewijzigd
+
+- Dit is een weergavewijziging. De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de meterregels, de blokkeerlogica, het statusmodel en de validatie zijn niet aangeraakt. De opbouw van de OSOD-records, de doelvalidator en de OSOD-, JSON- en XLSX-uitvoer zijn ongewijzigd. De invoervelden, hun maximale lengte en hun betekenis blijven gelijk; alleen de breedte waarmee de Duikerstabel op een smal scherm wordt getoond verandert. De overige tabellen in de app zijn niet gewijzigd. De Content-Security-Policy is ongewijzigd. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.23.0] - 2026-06-30
 
 De export- en importknoppen op twee schermen zijn opnieuw ingedeeld voor een duidelijke scheiding. Het scherm Dagregistratie is nu het werk- en back-upscherm: gegevens gaan eruit en erin. Het scherm Registratie is het uitvoerscherm naar buiten: alleen exporteren, in drie verwerkbare vormen. De Duikerstabel op Instellingen is beter leesbaar gemaakt op smalle en brede schermen.

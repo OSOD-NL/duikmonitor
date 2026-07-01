@@ -500,6 +500,13 @@
       input,select,textarea{font-size:16px!important;line-height:1.25!important;}
       input[type="time"],input[type="number"],input[type="text"],select,textarea{min-height:44px;}
       .tablewrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+      .table.diverstable{table-layout:auto;min-width:520px}
+      .table.diverstable col.divers-kenmerk{width:104px}
+      .table.diverstable col.divers-sh{width:104px}
+      .table.diverstable col.divers-mdd{width:52px}
+      .table.diverstable col.divers-set{width:52px}
+      .table.diverstable col.divers-mask{width:52px}
+      .table.diverstable td input.user{max-width:none;width:100%;box-sizing:border-box}
       .bottomnav button{flex:0 0 auto;min-width:92px;padding:8px 8px;font-size:11px;min-height:44px;border-radius:12px;background:var(--surface-navbtn);color:var(--text-main);white-space:nowrap}
       .bottomnav button.active{background:var(--tab-active-bg);color:var(--tab-active-text);border-color:var(--tab-active-border)}
     }
@@ -581,7 +588,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.23.0";
+  const APP_VERSION = "v1.24.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -3472,7 +3479,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.23.0", APP_VERSION, APP_VERSION==="v1.23.0");
+    push("basis","Appversielabel", "v1.24.0", APP_VERSION, APP_VERSION==="v1.24.0");
     // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
     // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
     // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
@@ -4196,6 +4203,49 @@
           "SH-seinhouder-koppeling in uitleg, negatieve grendel valt",
           `koppelt=${koppelt} grendel=${grendelValt}`,
           koppelt && grendelValt);
+      })();
+      // 4. Smal-scherm-breedtetest. Op smal scherm krijgen de cijferkolommen (MDD, Set,
+      // Masker) een vaste minimale kolombreedte die twee cijfers kan tonen, en staat de
+      // tabel in een scroll-container (overflow-x:auto) met een minimale totale breedte,
+      // zodat de gebruiker horizontaal veegt in plaats van dat de kolommen worden
+      // samengeknepen. De ondergrens voor de cijferkolommen is 48 px; de test leest de
+      // toegekende px-breedte uit de CSS en eist dat elke cijferkolom minstens die
+      // ondergrens haalt. Negatieve controle tegen tautologie: een variant met een te
+      // smalle kolombreedte (bijvoorbeeld 40 px) MOET de test laten falen.
+      (function(){
+        const css = diverstableCss();
+        const ONDERGRENS = 48;
+        function kolomBreedte(bron, kolom){
+          const m = bron.match(new RegExp("\\.table\\.diverstable col\\.divers-" + kolom + "\\{width:(\\d+)px\\}"));
+          return m ? parseInt(m[1], 10) : null;
+        }
+        function cijferkolommenHalen(bron, grens){
+          return ["mdd","set","mask"].every(function(k){
+            const w = kolomBreedte(bron, k);
+            return typeof w === "number" && w >= grens;
+          });
+        }
+        const mddW = kolomBreedte(css, "mdd");
+        const setW = kolomBreedte(css, "set");
+        const maskW = kolomBreedte(css, "mask");
+        const cijfersHalen = cijferkolommenHalen(css, ONDERGRENS);
+        const scopeInRender = settingsHtmlSource.includes('class="table diverstable"');
+        // De render plaatst de tabel binnen <div class="tablewrap">; die klasse draagt
+        // overflow-x:auto zodat de bredere tabel horizontaal scrollt.
+        const wrapInRender = settingsHtmlSource.includes('class="tablewrap"');
+        const wrapScrollt = css.includes(".tablewrap{max-width:100%;overflow-x:auto");
+        const tabelHeeftMinBreedte = /\.table\.diverstable\{table-layout:auto;min-width:\d+px\}/.test(css);
+        // Negatieve controle: dezelfde meetregel op een vervalste CSS waarin de
+        // cijferkolommen te smal staan, MOET falen (cijfersHalen wordt dan false).
+        const valsCss = ".table.diverstable col.divers-mdd{width:40px}"
+          + ".table.diverstable col.divers-set{width:40px}"
+          + ".table.diverstable col.divers-mask{width:40px}";
+        const valsCijfersHalen = cijferkolommenHalen(valsCss, ONDERGRENS);
+        const grendelValt = valsCijfersHalen === false;
+        push("ui","Duikerstabel: cijferkolommen minstens 48px en tabel scrollbaar op smal scherm",
+          "MDD/Set/Masker >= 48px, tabel met min-width in scroll-container, negatieve grendel valt",
+          `mdd=${mddW} set=${setW} mask=${maskW} cijfers=${cijfersHalen} minbreedte=${tabelHeeftMinBreedte} wrap=${wrapInRender} scroll=${wrapScrollt} scope=${scopeInRender} grendel=${grendelValt}`,
+          cijfersHalen && tabelHeeftMinBreedte && wrapInRender && wrapScrollt && scopeInRender && grendelValt);
       })();
     })();
     // Herzien (B-0024): de zichtbare kop is nu SH, niet voluit "Seinhouder"; de
