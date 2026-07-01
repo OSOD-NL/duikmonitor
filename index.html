@@ -315,6 +315,8 @@
     .fieldrow>div{min-width:0}
     input[type="date"].user{min-width:0;max-width:100%;}
     .btnrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+    .pastebox{margin-top:10px}
+    .pastebox textarea{width:100%;min-height:120px;box-sizing:border-box}
     button{
       border:none;
       border-radius:12px;
@@ -588,7 +590,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.25.0";
+  const APP_VERSION = "v1.26.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -2337,8 +2339,12 @@
       <details class="fold"${open1}><summary>Oefencodes dagdeel 1</summary><div class="fold-body"><div class="fieldrow"><div class="f4">${codeSelect('1',0)}</div><div class="f4">${codeSelect('1',1)}</div><div class="f4">${codeSelect('1',2)}</div></div></div></details>
       <details class="fold"${open2}><summary>Oefencodes dagdeel 2</summary><div class="fold-body"><div class="fieldrow"><div class="f4">${codeSelect('2',0)}</div><div class="f4">${codeSelect('2',1)}</div><div class="f4">${codeSelect('2',2)}</div></div></div></details>
       ${rosterHtml()}
-      <details class="fold no-print"><summary>Beheer en export</summary><div class="fold-body"><div class="btnrow">
-        <button class="ghost" data-export-json>Export JSON</button><button class="ghost" data-import-json>Import JSON</button><button class="ghost" data-export-dag-xlsx>Export XLSX</button>
+      <details class="fold no-print"><summary>Back-up en herstel</summary><div class="fold-body"><div class="btnrow">
+        <button class="ghost" data-export-json>Export JSON</button><button class="ghost" data-import-json>Import JSON</button><button class="ghost" data-paste-json>Plakken</button>
+      </div>
+      <div class="pastebox no-print" data-paste-panel hidden>
+        <textarea class="user" data-paste-input placeholder="Plak hier de JSON-back-up"></textarea>
+        <div class="btnrow"><button class="ghost primary" data-paste-run>Importeren</button><button class="ghost" data-paste-close>Sluiten</button></div>
       </div></div></details>
     </div>`;
   }
@@ -3491,7 +3497,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.25.0", APP_VERSION, APP_VERSION==="v1.25.0");
+    push("basis","Appversielabel", "v1.26.0", APP_VERSION, APP_VERSION==="v1.26.0");
     // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
     // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
     // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
@@ -5141,7 +5147,7 @@
       renderLive();
       const liveEl = document.getElementById("liveScreen");
       const html = liveEl ? liveEl.innerHTML : "";
-      const knopAanwezig = html.includes("data-export-dag-xlsx") && html.includes("Export XLSX");
+      const knopWeg = !html.includes("data-export-dag-xlsx") && !html.includes("Export XLSX");
       // Echte klik nadoen: de functie aanroepen die aan data-export-dag-xlsx hangt.
       const origDownload = downloadBlob;
       let cap = null;
@@ -5156,7 +5162,7 @@
       const sheetXmlOut = sheetXml(rows);
       const kopRij = rows[0].join(",");
       return {
-        knopAanwezig,
+        knopWeg,
         liep,
         downloadGemaakt: !!cap && /\.xlsx$/.test(cap.name||""),
         kopKlopt: kopRij.startsWith("dataset,duiker,dagdeel"),
@@ -5168,7 +5174,7 @@
         zetnrTekst: /t="inlineStr"><is><t[^>]*>02<\/t>/.test(sheetXmlOut)
       };
     });
-    push("ui","Dagregistratie: knop Export XLSX staat in de render", "knop aanwezig", dagXlsx.knopAanwezig?"knop aanwezig":"knop weg", dagXlsx.knopAanwezig===true);
+    push("ui","Dagregistratie: knop Export XLSX staat niet meer in de render", "knop weg", dagXlsx.knopWeg?"knop weg":"knop aanwezig", dagXlsx.knopWeg===true);
     push("ui","Dagregistratie: klik Export XLSX bouwt een XLSX-download", "download .xlsx opgebouwd", dagXlsx.liep && dagXlsx.downloadGemaakt?"download .xlsx opgebouwd":"geen download", dagXlsx.liep===true && dagXlsx.downloadGemaakt===true);
     push("ui","Dagregistratie-XLSX: kop en datarij conform de dagregistratie-inhoud", "kop dataset.., datarij live", `kop=${dagXlsx.kopKlopt} datarij=${dagXlsx.heeftDatarij}`, dagXlsx.kopKlopt===true && dagXlsx.heeftDatarij===true);
     push("ui","Dagregistratie-XLSX: opmaak (vette kop, breedtes, autofilter, bevroren rij, tekst-voorloopnul)", "alle opmaak aanwezig", `vet=${dagXlsx.kopVet} cols=${dagXlsx.kolomBreedtes} filter=${dagXlsx.autofilter} freeze=${dagXlsx.bevrorenRij} tekst=${dagXlsx.zetnrTekst}`, dagXlsx.kopVet && dagXlsx.kolomBreedtes && dagXlsx.autofilter && dagXlsx.bevrorenRij && dagXlsx.zetnrTekst);
@@ -5176,6 +5182,69 @@
     // dus de datarij-assertie zou daar moeten falen; doet zij ook.
     const dagXlsxNeg = testState({project:{date:today}}, ()=>{ const rows = dagregistratieRowsForExport(); return rows.some(r=>r[0]==="live"); });
     push("ui","Dagregistratie-XLSX negatieve controle: lege dag levert geen datarij", "geen datarij (grendel valt)", dagXlsxNeg?"datarij (fout)":"geen datarij", dagXlsxNeg===false);
+
+    // 1b. Plak-import: geldige JSON via de plak-route zet dezelfde state terug als
+    //     een directe importStateObject van hetzelfde object. Negatieve controle:
+    //     een veld dat voor de import anders was, draagt na de plak-import de
+    //     geimporteerde waarde (bewijst dat de plak-route echt importeert).
+    const plakGeldig = testState({}, ()=>{
+      const backup = {
+        version: 3,
+        project:{date:"2026-05-23", location:"Plaklocatie", post:"Post 9", dpl:"DPL9", veiligheidsregio:"VR Plak", activiteitType:"oefening", duiksysteem:"SCUBA"},
+        divers:[{id:"D1", code:"D1", label:"K01", active:true, defaultMdd:9}],
+        live:[{diverId:"D1", entryMode:"achteraf", registrationType:"normal", dtMode:"auto", start:"2026-05-23T09:00:00", surface:"2026-05-23T09:20:00", mdd:9, daypart:"1", rule:"auto", notes:"", airStartBar:300, airEndBar:210}]
+      };
+      const txt = JSON.stringify(backup);
+      // Import regenereert row-ids; vergelijk daarom op stabiele velden, niet op id.
+      const rowKey = d => [d.diverId, d.start, d.surface, d.mdd, d.airStartBar, d.airEndBar].join("|");
+      // Referentie: directe import van hetzelfde object in een aparte staat.
+      const before = state;
+      state = defaultState();
+      importStateObject(JSON.parse(JSON.stringify(backup)));
+      const directRows = (state.live||[]).map(rowKey).sort();
+      const directLoc = state.project.location;
+      state = before;
+      // Plak-route.
+      state = defaultState();
+      const locBefore = state.project.location;
+      const outcome = importStatePastedText(txt);
+      const plakRows = (state.live||[]).map(rowKey).sort();
+      const plakLoc = state.project.location;
+      return {
+        ok: outcome.ok,
+        gelijkeRijen: JSON.stringify(plakRows) === JSON.stringify(directRows),
+        directHeeftRij: directRows.length === 1 && directRows[0] === "D1|2026-05-23T09:00:00|2026-05-23T09:20:00|9|300|210",
+        locVeranderd: locBefore !== plakLoc && plakLoc === directLoc && plakLoc === "Plaklocatie",
+        locWasLeeg: !locBefore
+      };
+    });
+    push("ui","Plak-import: geldige JSON zet dezelfde registratie-rijen terug als directe import", "gelijke rijen", `ok=${plakGeldig.ok} gelijk=${plakGeldig.gelijkeRijen} ref=${plakGeldig.directHeeftRij}`, plakGeldig.ok===true && plakGeldig.gelijkeRijen===true && plakGeldig.directHeeftRij===true);
+    push("ui","Plak-import anti-tautologie: geimporteerd veld verandert aantoonbaar t.o.v. voor de import", "locatie gewijzigd naar geimporteerde waarde", `wasLeeg=${plakGeldig.locWasLeeg} veranderd=${plakGeldig.locVeranderd}`, plakGeldig.locWasLeeg===true && plakGeldig.locVeranderd===true);
+
+    // 1c. Plak-import: ongeldige JSON gooit geen onafgevangen fout en laat de
+    //     bestaande state onveranderd (geen gedeeltelijke overschrijving).
+    const plakOngeldig = testState({project:{date:"2026-05-23", location:"Blijft staan"}}, ()=>{
+      const locVoor = state.project.location;
+      const diversVoor = (state.divers||[]).length;
+      let onafgevangen = false;
+      let outcome;
+      try{ outcome = importStatePastedText("geen json"); }
+      catch(e){ onafgevangen = true; outcome = {ok:false}; }
+      return {
+        netjesGemeld: outcome.ok === false && !onafgevangen && typeof outcome.error === "string",
+        stateOngewijzigd: state.project.location === locVoor && (state.divers||[]).length === diversVoor
+      };
+    });
+    push("ui","Plak-import: ongeldige JSON meldt netjes een fout zonder onafgevangen exception", "fout afgevangen", plakOngeldig.netjesGemeld?"fout afgevangen":"exception of geen fout", plakOngeldig.netjesGemeld===true);
+    push("ui","Plak-import: ongeldige JSON laat de bestaande state ongewijzigd", "state ongewijzigd", plakOngeldig.stateOngewijzigd?"state ongewijzigd":"state gewijzigd (fout)", plakOngeldig.stateOngewijzigd===true);
+    // Negatieve controle (anti-tautologie): geldige JSON via dezelfde plak-functie
+    // MOET de state juist wel wijzigen; zou de ongewijzigd-assertie daar falen.
+    const plakNeg = testState({project:{date:"2026-05-23", location:"Oud"}}, ()=>{
+      const locVoor = state.project.location;
+      importStatePastedText(JSON.stringify({version:3, project:{date:"2026-05-23", location:"Nieuw"}, divers:[{id:"D1", code:"D1", label:"K01", active:true, defaultMdd:9}]}));
+      return state.project.location === locVoor;
+    });
+    push("ui","Plak-import negatieve controle: geldige JSON wijzigt de state wel (grendel valt)", "state gewijzigd", plakNeg?"state ongewijzigd (fout)":"state gewijzigd", plakNeg===false);
 
     // 2. Export OSOD op Registratie: knop aanwezig in render, klik bouwt de
     //    gevalideerde OSOD-records; een ongeldig record blokkeert de export.
@@ -6440,10 +6509,10 @@
     document.querySelectorAll("[data-day-note]").forEach(t=>{ t.oninput=()=>{ state.project.dayNote = cleanNote(t.value); save(); }; });
     document.querySelectorAll("[data-export-json]").forEach(b=>b.onclick=exportJson);
     document.querySelectorAll("[data-import-json]").forEach(b=>b.onclick=()=>document.getElementById("importFile").click());
-    document.querySelectorAll("[data-export-dag-xlsx]").forEach(b=>b.onclick=exportDagregistratieXlsx);
     document.querySelectorAll("[data-export-registration-osod]").forEach(b=>b.onclick=exportOsodJson);
     document.querySelectorAll("[data-export-registration-json]").forEach(b=>b.onclick=exportRegistrationJson);
     document.querySelectorAll("[data-export-registration-xlsx]").forEach(b=>b.onclick=exportRegistrationXlsx);
+    wirePasteImport();
     const verifyBadgeEl = document.getElementById("verifyBadge");
     if(verifyBadgeEl){
       const openReleases = () => window.open(RELEASES_URL, "_blank", "noopener,noreferrer");
@@ -6535,6 +6604,32 @@
     migrateDiveRows();
     repairActiveLiveTimerDates();
     return {droppedUnknownDiver, cleanedBars};
+  }
+  function importStatePastedText(txt){
+    try{
+      const result = importStateObject(JSON.parse(txt));
+      return {ok:true, result:result};
+    }
+    catch(err){ return {ok:false, error:(err && err.message) ? err.message : String(err)}; }
+  }
+  function wirePasteImport(){
+    const btn = document.querySelector("[data-paste-json]");
+    const panel = document.querySelector("[data-paste-panel]");
+    const area = document.querySelector("[data-paste-input]");
+    const runBtn = document.querySelector("[data-paste-run]");
+    const closeBtn = document.querySelector("[data-paste-close]");
+    if(!btn || !panel || !area || !runBtn || !closeBtn) return;
+    btn.onclick = ()=>{ panel.hidden = !panel.hidden; if(!panel.hidden) area.focus(); };
+    closeBtn.onclick = ()=>{ panel.hidden = true; area.value = ""; };
+    runBtn.onclick = ()=>{
+      const outcome = importStatePastedText(area.value);
+      if(!outcome.ok){ alert("Import mislukt: "+outcome.error); return; }
+      save(); render();
+      const result = outcome.result;
+      if(result && (result.droppedUnknownDiver > 0 || result.cleanedBars > 0)){
+        alert(`Import opgeschoond: ${result.droppedUnknownDiver} registratie(s) met een onbekende duiker overgeslagen (scope is D1 t/m D12), ${result.cleanedBars} ongeldige drukwaarde(n) opgeschoond.`);
+      }
+    };
   }
   document.getElementById("importFile").addEventListener("change", async e=>{
     const file=e.target.files[0]; if(!file) return;
