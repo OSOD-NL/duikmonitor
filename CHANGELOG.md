@@ -2,6 +2,29 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.23.0] - 2026-06-30
+
+De export- en importknoppen op twee schermen zijn opnieuw ingedeeld voor een duidelijke scheiding. Het scherm Dagregistratie is nu het werk- en back-upscherm: gegevens gaan eruit en erin. Het scherm Registratie is het uitvoerscherm naar buiten: alleen exporteren, in drie verwerkbare vormen. De Duikerstabel op Instellingen is beter leesbaar gemaakt op smalle en brede schermen.
+
+### Toegevoegd
+
+- Op het scherm Dagregistratie staat nu een knop Export XLSX. Deze levert de volledige dagregistratie (planning en werkelijk, beide datasets) als XLSX-bestand, met dezelfde inhoud als de eerdere CSV-uitvoer van dit scherm. Het bestand heeft een vette koprij, passende kolombreedtes, een filterregel, een bevroren bovenrij en schrijft zuivere getallen als getal en waarden met een voorloopnul als tekst.
+- Op het scherm Registratie staat nu een knop Export OSOD. Deze levert exact dezelfde gevalideerde OSOD-records als voorheen; bij een ongeldig record blokkeert de export, net als daarvoor. Alleen de knop staat nu op dit scherm.
+
+### Gewijzigd
+
+- De Duikerstabel op Instellingen verdeelt de kolombreedtes opnieuw. De twee tekstkolommen (Kenmerk en SH) krijgen ruime, gelijke breedte; de twee tweecijferige kolommen (Set en Masker) blijven smal. Daardoor blijven de namen op een smal scherm leesbaar, rekken de cijferkolommen op een breed scherm niet onnodig uit en kappen de kolomkoppen niet meer af. De koppen blijven op een regel en de cijferkolommen blijven onderling gelijk uitgelijnd.
+- Het scherm Dagregistratie toont onder Beheer en export nog drie knoppen: Export JSON, Import JSON en Export XLSX. De knoppen Export OSOD, Import OSOD, Export CSV en Print zijn van dit scherm verwijderd.
+- Het scherm Registratie toont in de exportregel nog drie knoppen: Export OSOD, Export XLSX en Export JSON. De knoppen Print en Export CSV zijn van dit scherm verwijderd.
+- De laatste, voor de gebruiker onbereikbare Print/PDF-knop op de printbare duiklogweergave is eveneens verwijderd, samen met het bijbehorende, nergens anders gebruikte printmechanisme. Daarmee staat er geen Print/PDF-knop meer in de bron. De printbare weergave zelf blijft bestaan.
+- Het scherm Registratie blijft uitsluitend uitvoer; er is geen import op dit scherm.
+- Appversielabel verhoogd naar v1.23.0; de bijbehorende zelftest controleert mee op v1.23.0.
+- Het opstart-zelftest-aantal gaat van 422 naar 430. Acht tests bij het verwijderde OSOD-importmechanisme zijn vervallen; dertien interactietests zijn toegevoegd voor de verplaatste en nieuwe knoppen, en drie aanvullende controles horen bij het stil maken van de opstartcontrole en het verwijderen van de laatste Print/PDF-knop. Die tests doen de echte klik na en controleren het opgebouwde bestand en de gerenderde uitvoer, met negatieve controles die bevestigen dat de verwijderde knoppen weg zijn, dat de opstartcontrole geen melding meer toont en dat de tests niet vanzelf slagen.
+
+### Niet gewijzigd
+
+- De rekenkern, de DCIEM-tabellen, de rekenbronfingerprint, de meterregels, de blokkeerlogica, het statusmodel en de validatie zijn niet aangeraakt. De opbouw van de OSOD-records, de doelvalidator en de inhoud van de OSOD-, JSON- en XLSX-uitvoer blijven inhoudelijk identiek; alleen de knoppen verplaatsen, verschijnen of verdwijnen. De verplaatste OSOD-uitvoer is gelijk aan de vorige en de XLSX van de dagregistratie bevat dezelfde gegevens als de eerdere CSV van dat scherm. De OSOD-export blokkeert nog steeds bij een ongeldig record, met dezelfde melding; alleen de bijbehorende opstartcontrole is zo aangepast dat zij die melding bij het opstarten niet meer zichtbaar maakt. De Content-Security-Policy is ongewijzigd. _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.22.0] - 2026-06-28
 
 De controle op een onmogelijke ademdrukmeting is verruimd. Tot nu toe gaf de luchtbewaking alleen een melding wanneer de laatste of einddruk hoger was dan de begindruk. Voortaan kijkt de bewaking ook naar de metingen onderling: als een latere meting een hogere druk laat zien dan een eerdere meting, verschijnt een korte controle-melding. Dit is en blijft een waarschuwing, geen drempel, grens of blokkade. De luchtberekening (verbruikstrend, resterende tijd tot 100 bar en de kritieke meldingen) blijft in alle gevallen gewoon doorlopen.
