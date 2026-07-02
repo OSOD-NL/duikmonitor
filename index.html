@@ -590,7 +590,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.26.0";
+  const APP_VERSION = "v1.27.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -1441,6 +1441,10 @@
       .filter(Boolean);
     d.airStartBar = cleanBarValue(d.airStartBar);
     d.airEndBar = cleanBarValue(d.airEndBar);
+    // Terugvalwaarde alleen voor oude records zonder veld: die stammen van voor de
+    // instelbare flessenset en zijn met 2x4 (8 L) gedoken. Nieuwe duikregels krijgen
+    // bij aanmaak de dan actieve set mee (newLiveDive/newBlankLiveDive), zodat het
+    // vastgelegde veld klopt met het werkelijk gebruikte toestel.
     if(d.airCylinderLiters === undefined) d.airCylinderLiters = AIR_CYLINDER_LITERS;
     if(d.airStopBar === undefined) d.airStopBar = AIR_STOP_BAR;
     if(d.airCheckIntervalMin === undefined) d.airCheckIntervalMin = airCheckIntervalForDepth(d.mdd);
@@ -1909,7 +1913,10 @@
           u.chainBlockedBy = chainBlocker.id;
         }
         resultUnits.push(u);
-        if((u.hgAdjusted || u.hgRaw) && u.surface && !u.chainBlockedBy){
+        // Een eenheid met chainUnreliable (OI < 15 min, HG uit alleen de eigen DT)
+        // mag geen ketenwaarde leveren: de vervolgduik gaat via dezelfde
+        // chainBlocker-route als na een onberekenbare duik, tot de 18-uursreset.
+        if((u.hgAdjusted || u.hgRaw) && u.surface && !u.chainBlockedBy && !u.chainUnreliable){
           prev = u;
         }else{
           chainBlocker = u;
@@ -1977,7 +1984,7 @@
   }
 
   function calcUnit(u, prev){
-    const res = {messages:[], severity:0, codes:[], oiMin:null, hf:null, hfLabel:"-", edt:null, ndl:null, hgRaw:null, hgAdjusted:null, calcType:"", safetyStop:false};
+    const res = {messages:[], severity:0, codes:[], oiMin:null, hf:null, hfLabel:"-", edt:null, ndl:null, hgRaw:null, hgAdjusted:null, calcType:"", safetyStop:false, chainUnreliable:false};
     if((u.events || []).some(e=>e.timerNeedsCheck)){
       addMsg(res,1,"Actieve timer is langer dan 8 uur; controleer starttijd of zet de duik boven/einde.");
       return res;
@@ -2051,6 +2058,14 @@
       res.edt = u.dtTotal;
       res.hgRaw = getHG(u.tableDepth, u.dtTotal);
       res.hgAdjusted = res.hgRaw;
+      // Bron: IWOD 002 (2019) par. 2300 en WOD v2.0 par. 11.5.1: bij een OI onder
+      // 15 minuten gelden de duiken samen als een gecombineerde duik; tabel 4a is
+      // niet van toepassing. De hier getoonde HG komt uit alleen de eigen DT en
+      // onderschat daarmee de werkelijke restbelasting van de gecombineerde duik.
+      // Deze HG mag daarom niet stilzwijgend als ketenwaarde voor een volgende
+      // herhalingsduik dienen: de keten gaat op handmatige beoordeling, net als na
+      // een onberekenbare duik (zie buildUnits). Het informatiefeit blijft staan.
+      res.chainUnreliable = true;
       return res;
     }
     if(hfRes.empty){
@@ -2059,7 +2074,13 @@
     }
     if(!res.hf){ addMsg(res,1,"HF kon niet worden bepaald."); return res; }
 
-    res.edt = Math.ceil(u.dtTotal * res.hf);
+    // EDT = DT x HF, in exacte tienden gerekend. HF heeft altijd precies een
+    // decimaal (tabel 4a), dus (DT x 10xHF) is een geheel getal en de deling
+    // door 10 rondt niet weg. De directe vermenigvuldiging DT x HF kan in
+    // binaire drijvende komma net boven een geheel product uitkomen (90 x 1,1
+    // werd 100 in plaats van 99); deze vorm sluit dat uit. Afronden naar boven
+    // blijft gelden voor niet-gehele producten, conform de kernregel.
+    res.edt = Math.ceil((u.dtTotal * Math.round(res.hf * 10)) / 10);
     res.ndl = getRepeatNDL(u.tableDepth, res.hf);
     if(!res.ndl){
       addMsg(res,1,"Voor deze diepte is geen herhalings-NDL in tabel 4b beschikbaar; gebruik 6-meterregel of beoordeel handmatig.");
@@ -2610,14 +2631,14 @@
     const div=state.divers.find(d=>d.id===diverId);
     const bar = validBar(airStartBar);
     const mdd = cleanMddValue(div?.defaultMdd, {clamp:true, fallback:6});
-    const d = ensureAirFields({id:uid(), diverId, entryMode:"live", registrationType:"normal", dtMode:"auto", dtUsedMin:"", phases:[], start:"", ascentStart:"", surface:"", mdd, rule:"auto", daypart:"1", notes:"", signalHolder:"", airStartBar:bar == null ? "" : Math.round(bar), setNo:div?.setNo || "", maskNo:div?.maskNo || "", airCheckIntervalMin:airCheckIntervalForDepth(mdd)});
+    const d = ensureAirFields({id:uid(), diverId, entryMode:"live", registrationType:"normal", dtMode:"auto", dtUsedMin:"", phases:[], start:"", ascentStart:"", surface:"", mdd, rule:"auto", daypart:"1", notes:"", signalHolder:"", airStartBar:bar == null ? "" : Math.round(bar), setNo:div?.setNo || "", maskNo:div?.maskNo || "", airCheckIntervalMin:airCheckIntervalForDepth(mdd), airCylinderLiters:airCylinderLiters()});
     stampField(d, "start", new Date());
     return d;
   }
   function newBlankLiveDive(){
     const diverId = firstActiveDiverId();
     const div = getDiver(diverId);
-    return ensureAirFields({id:uid(), diverId, entryMode:"achteraf", registrationType:"normal", dtMode:"auto", dtUsedMin:"", phases:[], start:"", ascentStart:"", surface:"", mdd:cleanMddValue(div.defaultMdd,{clamp:true,fallback:6}), rule:"auto", daypart:"1", notes:"", signalHolder:"", setNo:div.setNo||"", maskNo:div.maskNo||""});
+    return ensureAirFields({id:uid(), diverId, entryMode:"achteraf", registrationType:"normal", dtMode:"auto", dtUsedMin:"", phases:[], start:"", ascentStart:"", surface:"", mdd:cleanMddValue(div.defaultMdd,{clamp:true,fallback:6}), rule:"auto", daypart:"1", notes:"", signalHolder:"", setNo:div.setNo||"", maskNo:div.maskNo||"", airCylinderLiters:airCylinderLiters()});
   }
   function latestActiveDive(diverId){ return [...state.live].reverse().find(d=>d.diverId===diverId && d.start && !d.surface); }
   // "Loopt er ergens een duik": een live-duik met start && !surface, ongeacht welke duiker.
@@ -3497,7 +3518,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.26.0", APP_VERSION, APP_VERSION==="v1.26.0");
+    push("basis","Appversielabel", "v1.27.0", APP_VERSION, APP_VERSION==="v1.27.0");
     // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
     // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
     // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
@@ -4704,6 +4725,33 @@
     push("rekenregels","OI 14 min: onder 0:15, geen reguliere tabel-HF", "geen HF / <15-melding", `oiMin=${oiUnder?.oiMin} hf=${oiUnder?.hf}`, oiUnder?.oiMin===14 && oiUnder?.hf==null && (oiUnder?.messages||[]).some(m=>m.includes("OI < 15")));
     const oiAt = testState({planning:[ev("D1","08:00:00",10,9,"1","normal"),ev("D1","08:26:00",10,9,"1","normal")]},()=>{const u=calcDataset("planning").units;return u[u.length-1];});
     push("rekenregels","OI 15 min: eerste waarde via tabel 4a (HF 1,4 groep A)", "oiMin=15 hf=1,4", `oiMin=${oiAt?.oiMin} hf=${fmtHF(oiAt?.hf)}`, oiAt?.oiMin===15 && oiAt?.hf===1.4);
+    // Ketenintegriteit bij OI < 15 min (bron: IWOD 002 (2019) par. 2300; WOD v2.0
+    // par. 11.5.1: duiken met een OI onder 15 minuten gelden samen als een
+    // gecombineerde duik). De korte-OI-duik toont zijn eigen-DT-HG informatief,
+    // maar die HG mag geen ketenwaarde zijn: de vervolgduik gaat op handmatige
+    // beoordeling via de bestaande chainBlocker-route, tot de 18-uursreset.
+    const shortChain = testState({planning:[
+      ev("D1","08:00:00",120,9,"1","normal"),
+      ev("D1","10:10:00",10,9,"1","normal"),
+      ev("D1","11:21:00",200,9,"1","normal")
+    ]},()=>{const u=calcDataset("planning").units;return {mid:u[1], last:u[u.length-1]};});
+    push("rekenregels","OI < 15: vervolgduik gaat op handmatige beoordeling (keten geblokkeerd)", "sev 2, handmatig beoordelen, chainBlockedBy gezet", `sev=${shortChain.last?.severity} msg=${/handmatig beoordelen/.test((shortChain.last?.messages||[]).join(" | "))} blockedBy=${!!shortChain.last?.chainBlockedBy}`, shortChain.last?.severity===2 && /handmatig beoordelen/.test((shortChain.last?.messages||[]).join(" | ")) && !!shortChain.last?.chainBlockedBy);
+    push("rekenregels","OI < 15: korte-OI-duik blijft informatief zichtbaar maar is als ketenwaarde gemarkeerd", "hgRaw=A, chainUnreliable", `hgRaw=${shortChain.mid?.hgRaw} chainUnreliable=${shortChain.mid?.chainUnreliable===true}`, shortChain.mid?.hgRaw==="A" && shortChain.mid?.chainUnreliable===true);
+    const shortChainReset = testState({planning:[
+      ev("D1","08:00:00",120,9,"1","normal"),
+      ev("D1","10:10:00",10,9,"1","normal"),
+      {id:"scReset",diverId:"D1",start:"2026-05-24T04:22:00",dtMin:10,mdd:9,daypart:"1",rule:"normal",notes:"zelftest"}
+    ]},()=>{const u=calcDataset("planning").units;return u[u.length-1];});
+    push("rekenregels","OI > 18:00 na korte-OI-duik: keten hersteld, telling als eerste duik", "hf=1,0 zonder ketenmelding", `hf=${fmtHF(shortChainReset?.hf)} chainMsg=${/handmatig beoordelen/.test((shortChainReset?.messages||[]).join(" | "))}`, shortChainReset?.hf===1 && !/handmatig beoordelen/.test((shortChainReset?.messages||[]).join(" | ")));
+    // EDT in exacte tienden: gehele producten DT x HF mogen niet een minuut te hoog
+    // uitkomen door binaire drijvende komma (kernregel: EDT = DT x HF, naar boven
+    // afgerond; bij een geheel product valt er niets af te ronden).
+    const edt90 = testState({planning:[ev("D1","08:00:00",10,9,"1","normal"),ev("D1","09:11:00",90,9,"1","normal")]},()=>{const u=calcDataset("planning").units;return u[u.length-1];});
+    const edt50 = testState({planning:[ev("D1","08:00:00",10,9,"1","normal"),ev("D1","09:11:00",50,9,"1","normal")]},()=>{const u=calcDataset("planning").units;return u[u.length-1];});
+    push("rekenregels","EDT exact bij geheel product (90 x HF 1,1 = 99; 50 x HF 1,1 = 55)", "99 / 55 bij HF 1,1", `${edt90?.edt} / ${edt50?.edt} bij ${fmtHF(edt90?.hf)}`, edt90?.edt===99 && edt50?.edt===55 && edt90?.hf===1.1 && edt50?.hf===1.1);
+    // Tegenbewijs: de directe vermenigvuldiging komt hier wel een minuut te hoog uit;
+    // dit borgt dat de exacte-tienden-controle hierboven niet vanzelf slaagt.
+    push("rekenregels","EDT-tegenbewijs: directe ceil(90 x 1,1) wijkt af van de exacte tienden", "direct 100, exact 99", `direct ${Math.ceil(90*1.1)}, exact ${Math.ceil((90*11)/10)}`, Math.ceil(90*1.1)===100 && Math.ceil((90*11)/10)===99);
     // 18-uurs grens: tot en met OI 1080 min valt het in de tabeltak; vanaf 1081 min reset naar HF 1,0.
     const resetIn = testState({planning:[ev("D1","08:00:00",10,9,"1","normal"),{id:"r1",diverId:"D1",start:"2026-05-24T02:11:00",dtMin:10,mdd:9,daypart:"1",rule:"normal",notes:"t"}]},()=>{const u=calcDataset("planning").units;return u[u.length-1];});
     push("rekenregels","OI 1080 min (18:00): nog in tabeltak, niet de reset", "label 15:00-18:00", `oiMin=${resetIn?.oiMin} label=${resetIn?.hfLabel}`, resetIn?.oiMin===1080 && resetIn?.hfLabel==="15:00-18:00");
@@ -5731,6 +5779,33 @@
       }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
       push("ui","Gekozen set loopt door in de berekening: SAC bij 2x6 (12 L) schaalt lineair t.o.v. 2x4 (8 L), cylinderLiters volgt de set, geen hardgecodeerde 8; grendel valt",
         "sac12 = 1,5 * sac8; liters 8 resp. 12; geen 8 hardgecodeerd",
+        detail.join(" "), alleOk);
+    })();
+    // SET-3: het vastgelegde veld airCylinderLiters op een nieuwe duikregel volgt de
+    // dan actieve set (aanmaakmoment), zodat de registratie klopt met het werkelijk
+    // gebruikte toestel. Oude records zonder veld houden de terugval 8 (2x4), want
+    // die stammen van voor de instelbare set.
+    (function(){
+      const detail = [];
+      let alleOk = true;
+      try{
+        const bijSet = (set)=>testState({settings:{cylinderSet:set}}, ()=>({live: newLiveDive("D1", 300).airCylinderLiters, blank: newBlankLiveDive().airCylinderLiters}));
+        const s8 = bijSet("2x4");
+        const s12 = bijSet("2x6");
+        const nieuwVolgt = s8.live===8 && s8.blank===8 && s12.live===12 && s12.blank===12;
+        detail.push(`nieuw[2x4=${s8.live}/${s8.blank} 2x6=${s12.live}/${s12.blank}]`);
+        alleOk = alleOk && nieuwVolgt;
+        // Oud record zonder veld: terugval blijft 8, ook als de actieve set 2x6 is.
+        const oud = testState({settings:{cylinderSet:"2x6"}}, ()=>ensureAirFields({id:"oudRecord",diverId:"D1",mdd:6,daypart:"1",rule:"auto"}).airCylinderLiters);
+        detail.push(`oud[terugval=${oud}]`);
+        alleOk = alleOk && oud===8;
+        // Grendel: bij actieve set 2x6 mag een nieuwe regel NIET 8 vastleggen.
+        const grendelValt = s12.live!==8 && s12.blank!==8;
+        detail.push(`grendel[nietAcht=${grendelValt}]`);
+        alleOk = alleOk && grendelValt;
+      }catch(e){ alleOk=false; detail.push("uitzondering: "+(e&&e.message?e.message:String(e))); }
+      push("ui","Nieuwe duikregel legt de actieve flessenset vast (2x4 geeft 8 L, 2x6 geeft 12 L); oud record zonder veld valt terug op 8; grendel valt",
+        "nieuw volgt set; oud 8; geen 8 bij 2x6",
         detail.join(" "), alleOk);
     })();
     // SET-3: vergrendeling bij een lopende duik. Met een lopende duik (start && !surface)

@@ -2,6 +2,19 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.27.0] - 2026-07-02
+
+### Gewijzigd
+
+- Ketenbewaking: een duik met een oppervlakte-interval onder 15 minuten geeft zijn onderschatte HG niet meer door als ketenwaarde; de vervolgduik gaat via de bestaande route op handmatige beoordeling, tot de 18-uursreset. De korte-OI-duik zelf blijft ongewijzigd zichtbaar met dezelfde waarschuwing. Bron: IWOD 002 (1 april 2019) par. 2300 en Werkinstructie WOD v2.0 par. 11.5.
+- EDT in exacte tienden: een geheel product DT x HF komt niet langer een minuut te hoog uit door binaire drijvende komma (90 x 1,1 is nu 99); niet-gehele producten ronden onveranderd naar boven.
+- Een nieuwe duikregel legt de op dat moment actieve flessenset vast in het flesinhoud-veld (2x4 geeft 8 L, 2x6 geeft 12 L); oude records zonder veld houden de terugval 8.
+- Appversielabel naar v1.27.0; opstart-zelftest-aantal van 438 naar 444.
+
+### Niet gewijzigd
+
+- DCIEM-tabellen, rekenbronfingerprint, Tabel 4a-fixture, meterregels, statusmodel en opstijgingslaag; OSOD-, JSON- en XLSX-uitvoer veld-identiek; CSP, _headers, site.webmanifest en iconen byte-identiek.
+
 ## [1.26.0] - 2026-07-01
 
 De uitklaphoek op de Dagregistratie is de back-uphoek van de app geworden. De hoek heet nu "Back-up en herstel", de knop Export XLSX is er weggehaald (deze blijft op het scherm Registratie), en er is een knop Plakken bijgekomen waarmee een JSON-back-up rechtstreeks als tekst kan worden teruggezet zonder bestand.
