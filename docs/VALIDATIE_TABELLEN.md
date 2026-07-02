@@ -99,6 +99,16 @@ Het bronvoorbeeld (voorafgaande duik HG D, HI minder dan 6 uur, uitgevoerde duik
 
 De tekst van `over12UnplannedProcedure` is woordelijk afgestemd op de bron. De eerdere formulering "melden/voorleggen aan DMC/duikerarts" is vervangen door "het voorval melden aan het hoofd van het Duikmedisch Centrum (HDMC)", conform logboek p. 31. De rekenlogica en de drempelwaarden zijn hierbij niet gewijzigd.
 
+## Aanscherping v1.27.0: ketenwaarde bij OI onder 15 minuten
+
+Bron: IWOD 002 (1 april 2019) par. 2300 en Werkinstructie WOD v2.0 par. 11.5.1: duiken met een oppervlakte-interval korter dan 15 minuten gelden samen als een gecombineerde duik; tabel 4a is op zo'n interval niet van toepassing.
+
+De monitor toonde bij zo'n korte-OI-duik al de juiste waarschuwing en berekende informatief een HG uit alleen de eigen duiktijd van die duik. Die HG onderschat per definitie de restbelasting van de gecombineerde duik. Tot en met v1.26.0 werd die onderschatte HG stilzwijgend als ketenwaarde gebruikt voor een volgende herhalingsduik, waardoor die vervolgduik een te gunstige HF, herhalings-NDL en status kon tonen. Vanaf v1.27.0 markeert de rekenmotor de korte-OI-duik als niet-ketenbetrouwbaar (`chainUnreliable`): de vervolgduik gaat via de bestaande chainBlocker-route op handmatige beoordeling (buitengrens, `INVALID_INPUT`), tot de 18-uursreset. De korte-OI-duik zelf blijft ongewijzigd zichtbaar met dezelfde waarschuwing; er is geen tabelwaarde gewijzigd en de bronfingerprint is ongewijzigd. Zelftests dekken de blokkade, de markering en het herstel na 18 uur.
+
+## Aanscherping v1.27.0: EDT in exacte tienden
+
+Kernregel: EDT = DT x HF, naar boven afgerond. HF heeft in tabel 4a altijd precies een decimaal. De eerdere directe vermenigvuldiging `Math.ceil(dt * hf)` kon bij een geheel product in binaire drijvende komma net boven dat gehele getal uitkomen en dan een minuut te hoog afronden (bijvoorbeeld 90 x 1,1 werd 100 in plaats van 99; dit trad op bij 33 combinaties, alle met HF 1,1). De afwijking was altijd naar boven en sloeg aantoonbaar nooit een HG-drempel of statusgrens om, maar het gerapporteerde EDT in registratie, XLSX en OSOD-uitvoer was in die gevallen feitelijk onjuist. Vanaf v1.27.0 rekent de motor in exacte tienden: `Math.ceil((dt * Math.round(hf * 10)) / 10)`. Gehele producten blijven exact; niet-gehele producten ronden onveranderd naar boven. Een zelftest borgt de exacte waarden en een tegenbewijs-controle laat zien dat de directe vermenigvuldiging op deze gevallen zou afwijken.
+
 ## Samenvatting
 
 | Datablok | Gecontroleerde posities | Afwijkingen |

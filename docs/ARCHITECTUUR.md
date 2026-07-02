@@ -44,7 +44,7 @@ Kern van de DCIEM-rekenmotor. Bepaalt onder andere:
 
 ### `buildUnits` en `calcDataset`
 
-Groeperen duikmomenten per duiker/dagdeel en bepalen of meterregels of normale DCIEM-berekening gelden. Hier zit de scheiding tussen 6/9/12-meterregel, afzonderlijke duiken en >12m-situaties.
+Groeperen duikmomenten per duiker/dagdeel en bepalen of meterregels of normale DCIEM-berekening gelden. Hier zit de scheiding tussen 6/9/12-meterregel, afzonderlijke duiken en >12m-situaties. Hier zit ook de ketenbewaking voor herhalingsduiken: een eenheid die niet volledig tabelmatig berekend is, geen boven-tijd heeft of als niet-ketenbetrouwbaar is gemarkeerd (`chainUnreliable`, gezet bij een oppervlakte-interval onder 15 minuten) levert geen ketenwaarde; de vervolgduik gaat dan op handmatige beoordeling tot de 18-uursreset.
 
 ### `applyAscentLimits`
 
