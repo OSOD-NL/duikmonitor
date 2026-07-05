@@ -2,6 +2,19 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.28.0] - 2026-07-05
+
+### Gewijzigd
+
+- Korte-OI-conformiteit (OSOD-basistoets R-BASIS-012): een herhalingsduik met een oppervlakte-interval onder 15 minuten blokkeert nu zelf als lege tabelcel (status geblokkeerd, code EMPTY_TABLE_CELL) in plaats van een waarschuwing te tonen; de duiken gelden samen als gecombineerde duik en tabel 4a heeft daarvoor geen toepasbare cel. De eigen-DT-HG blijft informatief zichtbaar en registratie blijft mogelijk.
+- De ketenblokkade op de vervolgduik na een korte-OI-duik draagt als blokkeerreden EMPTY_TABLE_CELL in plaats van INVALID_INPUT; alle overige ketenblokkades (ontbrekende MDD/DT, tijdvolgorde, fasen) houden INVALID_INPUT.
+- R-BASIS-012 is opgenomen in de opstartkritieke OSOD-basistoetsen; twee bestaande ketentoetsen controleren nu ook status en code, en een bedieningstoets controleert met negatieve controle dat de duikregel zichtbaar geblokkeerd rendert.
+- Appversielabel naar v1.28.0; opstart-zelftest-aantal van 444 naar 447.
+
+### Niet gewijzigd
+
+- De rekenweg zelf (tijden, HF, HG, EDT), de DCIEM-tabellen, de rekenbronfingerprint, Tabel 4a en 4b, de meterregels en de opstijgingslaag. Er komt geen gecombineerde-duik-berekening of keuzescherm bij; geen andere severity-2-melding of code geraakt. De opbouw van de OSOD-records, de doelvalidator en de JSON- en XLSX-uitvoer zijn ongewijzigd. CSP, _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.27.0] - 2026-07-02
 
 ### Gewijzigd
