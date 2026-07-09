@@ -2,6 +2,20 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.29.0] - 2026-07-05
+
+### Toegevoegd
+
+- Bij een blokkade wegens een kort oppervlakte-interval (onder 15 minuten, code EMPTY_TABLE_CELL) toont het scherm nu een informatief keuzeblok met handelingsopties: wachten tot het eerstvolgende geldige tijdstip, meterregel-planning, niet duiken, of handmatige beoordeling. Het wachttijdstip wordt exact uit tabel 4a berekend (kloktijd en resterende duur) op basis van de geldende herhalingsgroep en de boventijd van de eerste duik. Het keuzeblok is puur informatief en verschijnt alleen bij deze specifieke oorzaak, niet bij een lege tabelcel wegens HF groter dan 2,0 of bij een gewone duik.
+
+### Gewijzigd
+
+- Appversielabel naar v1.29.0; opstart-zelftest-aantal van 447 naar 453.
+
+### Niet gewijzigd
+
+- De blokkade blijft ongewijzigd rood (statuspil buitengrens); er komt geen tussenstatus, geen nieuwe status en geen nieuwe code bij. De rekenweg (tijden, HF, HG, EDT), de DCIEM-tabellen, de rekenbronfingerprint, Tabel 4a en 4b, de meterregels, de opstijgingslaag en de blokkeerlogica blijven ongewijzigd. Er komt geen gecombineerde-duik-berekening bij en die wordt niet als geldig rekenresultaat gepresenteerd. De opbouw van de OSOD-records, de doelvalidator en de JSON- en XLSX-uitvoer zijn ongewijzigd. CSP, _headers, site.webmanifest en de iconen blijven byte-identiek.
+
 ## [1.28.0] - 2026-07-05
 
 ### Gewijzigd

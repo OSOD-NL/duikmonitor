@@ -590,7 +590,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "v1.28.0";
+  const APP_VERSION = "v1.29.0";
   const EXPECTED_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
   const PUBLIC_APP_URL = "https://duikmonitor.nl/";
   const REPO_URL = "https://github.com/OSOD-NL/duikmonitor";
@@ -1914,6 +1914,12 @@
           // MDD/DT, tijdvolgorde, fasen) houden INVALID_INPUT.
           if(chainBlocker.chainUnreliable === true){
             addMsg(u,2,"Eerdere duik voor deze duiker geldt als gecombineerde duik (OI < 15 minuten) zonder toepasbare cel in tabel 4a; herhalingsduik handmatig beoordelen.","EMPTY_TABLE_CELL");
+            // Zelfde informatieve keuzeblok geldt voor deze vervolgduik: markeer de
+            // korte-OI-oorzaak en neem de geldende HG en boventijd van de blokkerende
+            // duik over. Puur weergave; status, codes en berekening blijven gelijk.
+            u.shortOiChain = true;
+            u.shortOiWaitHG = chainBlocker.shortOiWaitHG || null;
+            u.shortOiSurface = chainBlocker.shortOiSurface || null;
           }else{
             addMsg(u,2,"Eerdere duik voor deze duiker is niet volledig tabelmatig berekend of heeft geen boven-tijd; herhalingsduik handmatig beoordelen.","INVALID_INPUT");
           }
@@ -2075,6 +2081,12 @@
       // herhalingsduik dienen: de keten gaat op handmatige beoordeling, net als na
       // een onberekenbare duik (zie buildUnits). Het informatiefeit blijft staan.
       res.chainUnreliable = true;
+      // Presentatiegegeven voor het informatieve keuzeblok bij deze blokkade:
+      // de geldende herhalingsgroep (dezelfde die de reguliere berekening zou
+      // lezen) en de boventijd van de voorgaande duik. Puur voor weergave; geen
+      // invloed op status, codes of berekening.
+      res.shortOiWaitHG = prev.hgAdjusted || prev.hgRaw || null;
+      res.shortOiSurface = prev.surface || null;
       return res;
     }
     if(hfRes.empty){
@@ -2524,6 +2536,51 @@
     }
     return zin + ".";
   }
+  // Eerstvolgende geldige tijdstip bij een blokkade wegens kort oppervlakte-interval.
+  // Puur afgeleid uit het tabeldomein van tabel 4a: gegeven de geldende herhalingsgroep
+  // en de boventijd van de eerste duik, de eerste kolomgrens (col.min) groter dan het
+  // huidige oppervlakte-interval waarvoor tabel 4a voor die HG een waarde heeft. Het
+  // tijdstip is exact die kolomgrens na de boventijd; geen afronding die van de grens
+  // afwijkt. Retour null als er voor die HG geen gevulde kolom is of gegevens ontbreken.
+  function shortOiNextValid(hg, surfaceTime, oiMin, now = new Date()){
+    if(!hg || !surfaceTime || !(surfaceTime instanceof Date)) return null;
+    const row = table4a[hg];
+    if(!row) return null;
+    const oi = (oiMin == null || !Number.isFinite(oiMin)) ? 0 : oiMin;
+    for(let i = 0; i < table4aCols.length; i++){
+      const col = table4aCols[i];
+      if(col.min <= oi) continue;
+      if(row[i] == null) continue;
+      const at = addMin(surfaceTime, col.min);
+      const minutesUntil = Math.max(0, Math.round(minsBetween(now, at)));
+      return { atMin: col.min, at, minutesUntil };
+    }
+    return null;
+  }
+  // Informatief keuzeblok bij een blokkade wegens kort oppervlakte-interval. Verschijnt
+  // alleen bij die specifieke oorzaak (de gecombineerde-duik-blokkade of de vervolgduik
+  // die daardoor in de keten is geblokkeerd), niet bij een lege tabelcel wegens HF > 2,0
+  // en niet bij een gewone duik. Verandert de status niet: de duik blijft geblokkeerd en
+  // de statuspil blijft rood/buitengrens. Het blok toont uitsluitend handelingsopties.
+  function isShortOiBlocked(unit){
+    if(!unit) return false;
+    if((unit.severity ?? 0) < 2) return false;
+    if(!(unit.codes || []).includes("EMPTY_TABLE_CELL")) return false;
+    return unit.chainUnreliable === true || unit.shortOiChain === true;
+  }
+  function renderShortOiOptions(unit){
+    if(!isShortOiBlocked(unit)) return "";
+    const items = [];
+    const wait = shortOiNextValid(unit.shortOiWaitHG, unit.shortOiSurface, unit.oiMin);
+    if(wait){
+      items.push(`Wachten: vanaf ${fmtTime(wait.at, false)} (over ${fmtDur(wait.minutesUntil)}) geldt de reguliere herhalingsduikberekening.`);
+    }
+    items.push("Meterregel: als alle duiken van dit samenstel binnen dezelfde categorie van 6, 9 of 12 meter blijven, geldt de meterregelweg.");
+    items.push("Niet duiken.");
+    items.push("Handmatige beoordeling, vast te leggen in de vrije notitie.");
+    const lis = items.map(t => `<li>${esc(t)}</li>`).join("");
+    return `<div class="hint" style="margin-top:6px"><b>Handelingsopties</b><ul class="messages" style="margin-top:4px">${lis}</ul><div class="hint small muted">Informatief; verandert de blokkade niet. De duik blijft geblokkeerd.</div></div>`;
+  }
   function renderMessages(unit){ return unit?.messages?.length ? `<ul class="messages">${unit.messages.map(m=>`<li>${esc(m)}</li>`).join("")}</ul>` : ""; }
   function opkomstText(d){
     return ascentCheckText(d);
@@ -2540,7 +2597,7 @@
       <td>${dataset==='planning'?`<input aria-label="Geplande DT (min)" class="user" type="number" step="1" min="0" data-dive-field="dtMin" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.dtMin||"")}">`:timeInput('ascentStart', d.ascentStart)}</td>
       <td>${dataset==='planning'?`<input aria-label="MDD" class="user" type="text" inputmode="decimal" data-dive-field="mdd" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.mdd||"")}">`:`${timeInput('surface', d.surface)}<input aria-label="MDD" class="user" type="text" inputmode="decimal" data-dive-field="mdd" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.mdd||"")}" title="MDD">`}</td>
       ${dataset==='live'?`<td><select aria-label="DT-bron" class="user" data-dive-field="dtMode" data-dataset="${dataset}" data-id="${esc(d.id)}">${dtModeOptions(d.dtMode)}</select><input aria-label="DT (min)" class="user" type="number" step="1" min="0" data-dive-field="dtUsedMin" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.dtUsedMin||'')}" placeholder="min, leeg=auto" style="margin-top:4px"></td><td><input aria-label="Set" class="user" inputmode="numeric" maxlength="2" data-dive-field="setNo" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.setNo||'')}" placeholder="Set #"><input aria-label="Masker" class="user" inputmode="numeric" maxlength="2" data-dive-field="maskNo" data-dataset="${dataset}" data-id="${esc(d.id)}" value="${esc(d.maskNo||'')}" placeholder="Masker #" style="margin-top:4px"></td>`:''}
-      <td>${renderStatus(unit)}${renderMessages(unit)}</td>
+      <td>${renderStatus(unit)}${renderMessages(unit)}${renderShortOiOptions(unit)}</td>
       <td class="small">${esc(dciemSummary(unit))}</td>
       <td class="small">${opkomstBadge({...d,dataset}, true)}</td>
       <td><button class="mini bad" data-delete-dive data-dataset="${dataset}" data-id="${esc(d.id)}">Wis</button></td>
@@ -2572,6 +2629,7 @@
       ${renderPhaseEditor(dataset,d)}
       <div class="statusline"><span class="pill neutral">${esc(dciemSummary(unit))}</span>${opkomstBadge({...d,dataset}, true)}${dataset==='live'?`<span class="pill neutral">${entryModeLabel(d.entryMode)} · ${registrationTypeLabel(d.registrationType)} · DT-bron ${dtModeLabel(d.dtMode)}</span>`:''}</div>
       ${renderMessages(unit)}
+      ${renderShortOiOptions(unit)}
       <div class="btnrow no-print"><button class="mini bad" data-delete-dive data-dataset="${dataset}" data-id="${esc(d.id)}">Wis duikregel</button></div>
     </div>`;
   }
@@ -3527,7 +3585,7 @@
     };
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
-    push("basis","Appversielabel", "v1.28.0", APP_VERSION, APP_VERSION==="v1.28.0");
+    push("basis","Appversielabel", "v1.29.0", APP_VERSION, APP_VERSION==="v1.29.0");
     // UI-interactietest (B-0024): de drie standen van de boot-gate-badge worden via
     // updateVerifyBadge() echt gerenderd in het verifyBadge-element en de gerenderde
     // uitkomst wordt gecontroleerd, niet alleen een interne variabele. Eén zelftest dekt
@@ -4789,6 +4847,95 @@
       push("ui","Korte OI (negatieve controle): met OI 15 rendert dezelfde duikregel niet als geblokkeerd",
         "pil bad=nee, melding=nee", `pil bad=${uit.okBad?'ja':'nee'}, melding=${uit.okMsg?'ja':'nee'}`,
         uit.okBad===false && uit.okMsg===false);
+    })();
+    // ===== v1.29.0: keuzescherm bij korte-OI-blokkade =====
+    // Deze toetsen dekken de nieuwe interactieve UI met een negatieve controle en het
+    // exactheidsbewijs van de wachttijd, conform de besluiten over wachttijd-indicatie
+    // en handelingsopties bij een blokkade met een kort oppervlakte-interval.
+    // Exactheid wachttijd: het eerstvolgende geldige tijdstip volgt uitsluitend uit het
+    // tabeldomein van tabel 4a. Kernvectoren: geldende HG D geeft de eerste gevulde kolom
+    // 0:15-0:29 (15 min na boven); geldende HG G heeft die kolom leeg en geeft 0:30-0:59
+    // (30 min na boven). Boventijd vast op 12:00; huidig OI kort (5 min).
+    (function(){
+      const surf = new Date(`${today}T12:00:00`);
+      const oiKort = 5;
+      const wD = shortOiNextValid("D", surf, oiKort, new Date(`${today}T12:05:00`));
+      const wG = shortOiNextValid("G", surf, oiKort, new Date(`${today}T12:05:00`));
+      const dOk = !!wD && wD.atMin===15 && wD.at.getTime()===new Date(`${today}T12:15:00`).getTime() && wD.minutesUntil===10;
+      const gOk = !!wG && wG.atMin===30 && wG.at.getTime()===new Date(`${today}T12:30:00`).getTime() && wG.minutesUntil===25;
+      push("rekenregels","Wachttijd korte OI: geldende HG D geeft eerstvolgend geldig tijdstip op 15 min na boven (kolom 0:15-0:29)",
+        "atMin 15, kloktijd 12:15, resterend 10 min", `atMin ${wD?wD.atMin:'-'}, kloktijd ${wD?fmtTime(wD.at,false):'-'}, resterend ${wD?wD.minutesUntil:'-'} min`, dOk);
+      push("rekenregels","Wachttijd korte OI: geldende HG G geeft eerstvolgend geldig tijdstip op 30 min na boven (kolom 0:15-0:29 leeg, 0:30-0:59 gevuld)",
+        "atMin 30, kloktijd 12:30, resterend 25 min", `atMin ${wG?wG.atMin:'-'}, kloktijd ${wG?fmtTime(wG.at,false):'-'}, resterend ${wG?wG.minutesUntil:'-'} min`, gOk);
+      // Anti-tautologie: een bewust foutieve verwachting (HG G op 15 min) moet falen.
+      const gFoutief = !!wG && wG.atMin===15;
+      push("rekenregels","Wachttijd korte OI (anti-tautologie): foutieve verwachting HG G op 15 min faalt",
+        "foutieve verwachting is onwaar", `HG G op 15 min = ${gFoutief}`, gFoutief===false);
+    })();
+    // UI-interactietest met negatieve controle: bouw een korte-OI-blokkade na met de echte
+    // stempelhandeling en render de duikregel. Controleer dat de statuspil buitengrens/bad
+    // blijft, dat het keuzeblok met de wachttijd-optie en de drie overige opties aanwezig
+    // is, en dat het keuzeblok NIET verschijnt bij een gewone duik (OI 15, geen blokkade)
+    // en NIET bij een lege-cel-blokkade wegens HF > 2,0 zonder korte OI.
+    (function(){
+      const uit = testState({live:[
+        ensureAirFields({id:"kob1",diverId:"D1",entryMode:"live",registrationType:"normal",dtMode:"auto",start:"",surface:"",mdd:9,daypart:"1",rule:"normal",notes:"",airStartBar:300,airEndBar:250}),
+        ensureAirFields({id:"kob2",diverId:"D1",entryMode:"live",registrationType:"normal",dtMode:"auto",start:"",surface:"",mdd:9,daypart:"1",rule:"normal",notes:"",airStartBar:250,airEndBar:200})
+      ]},()=>{
+        const d1 = state.live[0], d2 = state.live[1];
+        stampField(d1,"start",new Date(`${today}T08:00:00`));
+        stampField(d1,"ascentStart",new Date(`${today}T08:10:00`));
+        stampField(d1,"surface",new Date(`${today}T08:11:00`));
+        stampField(d2,"start",new Date(`${today}T08:25:00`));
+        stampField(d2,"ascentStart",new Date(`${today}T08:34:00`));
+        stampField(d2,"surface",new Date(`${today}T08:35:00`));
+        let calc = calcDataset("live");
+        const rijKort = renderDiveRow("live", d2, 1, calc.byEvent.get("kob2"));
+        // Negatieve controle 1: gewone duik (OI 15, geen blokkade).
+        stampField(d2,"start",new Date(`${today}T08:26:00`));
+        calc = calcDataset("live");
+        const rijOk = renderDiveRow("live", d2, 1, calc.byEvent.get("kob2"));
+        return {
+          kortBad: rijKort.includes('<span class="pill bad">buitengrens</span>'),
+          kortBlok: rijKort.includes("Handelingsopties"),
+          kortWacht: rijKort.includes("Wachten:") && rijKort.includes("reguliere herhalingsduikberekening"),
+          kortMeter: rijKort.includes("meterregelweg"),
+          kortNiet: rijKort.includes("Niet duiken."),
+          kortHand: rijKort.includes("Handmatige beoordeling"),
+          okBlok: rijOk.includes("Handelingsopties")
+        };
+      });
+      // Negatieve controle 2: lege-cel-blokkade wegens HF > 2,0 zonder korte OI. Bouw HG
+      // op naar G met twee duiken (15 m), en laat een derde duik met OI 20 min (kolom
+      // 0:15-0:29, voor HG G leeg) blokkeren als lege tabelcel. De OI is 20 min, dus GEEN
+      // korte OI; chainUnreliable en shortOiChain blijven onwaar. Het keuzeblok mag hier
+      // niet verschijnen. Live-modus met echte stempelhandeling voor exacte boventijden.
+      const mkLeeg = (id)=>ensureAirFields({id,diverId:"D1",entryMode:"live",registrationType:"normal",dtMode:"auto",start:"",surface:"",mdd:15,daypart:"1",rule:"normal",notes:"",airStartBar:300,airEndBar:250});
+      const leeg = testState({live:[mkLeeg("nc2a"),mkLeeg("nc2b"),mkLeeg("nc2c")]},()=>{
+        const a=state.live[0], b=state.live[1], c=state.live[2];
+        stampField(a,"start",new Date(`${today}T08:00:00`));
+        stampField(a,"ascentStart",new Date(`${today}T08:54:00`));
+        stampField(a,"surface",new Date(`${today}T08:55:00`));
+        stampField(b,"start",new Date(`${today}T09:15:00`));
+        stampField(b,"ascentStart",new Date(`${today}T09:35:00`));
+        stampField(b,"surface",new Date(`${today}T09:36:00`));
+        stampField(c,"start",new Date(`${today}T09:56:00`));
+        stampField(c,"ascentStart",new Date(`${today}T10:10:00`));
+        stampField(c,"surface",new Date(`${today}T10:11:00`));
+        const calc = calcDataset("live");
+        return {last: calc.byEvent.get("nc2c"), blok: renderDiveRow("live", c, 2, calc.byEvent.get("nc2c"))};
+      });
+      const leegHeeftBlokkade = (leeg.last?.severity===2) && (leeg.last?.codes||[]).includes("EMPTY_TABLE_CELL") && leeg.last?.chainUnreliable!==true && leeg.last?.shortOiChain!==true && leeg.last?.oiMin>=15;
+      const leegGeenKeuzeblok = !leeg.blok.includes("Handelingsopties");
+      push("ui","Keuzeblok korte OI: verschijnt bij korte-OI-blokkade met statuspil buitengrens en alle vier de opties",
+        "pil bad=ja, blok=ja, wachten=ja, meterregel=ja, niet duiken=ja, handmatig=ja",
+        `pil bad=${uit.kortBad?'ja':'nee'}, blok=${uit.kortBlok?'ja':'nee'}, wachten=${uit.kortWacht?'ja':'nee'}, meterregel=${uit.kortMeter?'ja':'nee'}, niet duiken=${uit.kortNiet?'ja':'nee'}, handmatig=${uit.kortHand?'ja':'nee'}`,
+        uit.kortBad===true && uit.kortBlok===true && uit.kortWacht===true && uit.kortMeter===true && uit.kortNiet===true && uit.kortHand===true);
+      push("ui","Keuzeblok korte OI (negatieve controle 1): geen keuzeblok bij gewone duik zonder blokkade",
+        "blok=nee", `blok=${uit.okBlok?'ja':'nee'}`, uit.okBlok===false);
+      push("ui","Keuzeblok korte OI (negatieve controle 2): geen keuzeblok bij lege-cel-blokkade wegens HF > 2,0 zonder korte OI",
+        "blokkade aanwezig=ja, keuzeblok=nee", `blokkade EMPTY_TABLE_CELL zonder korte OI=${leegHeeftBlokkade?'ja':'nee'}, keuzeblok=${leegGeenKeuzeblok?'nee':'ja'}`,
+        leegHeeftBlokkade===true && leegGeenKeuzeblok===true);
     })();
     // EDT in exacte tienden: gehele producten DT x HF mogen niet een minuut te hoog
     // uitkomen door binaire drijvende komma (kernregel: EDT = DT x HF, naar boven
