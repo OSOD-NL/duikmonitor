@@ -1900,13 +1900,33 @@
     const resultUnits=[];
     for(const arr of byDiver.values()){
       arr.sort((a,b)=>a.start-b.start);
+      const pending = arr.slice();
       let prev = null, chainBlocker = null;
-      for(const u of arr){
+      while(pending.length){
+        const u = pending.shift();
         if(chainBlocker?.surface && u.start && minsBetween(chainBlocker.surface, u.start) > 1080){
           chainBlocker = null;
           prev = null;
         }
-        const r = calcUnit(u, chainBlocker ? null : prev);
+        const calcPrev = chainBlocker ? null : prev;
+        if(u.appliedRule && u.events.length > 1){
+          const startOiMin = calcPrev?.surface && u.start ? Math.floor(minsBetween(calcPrev.surface, u.start)) : null;
+          const startHF = chainBlocker
+            ? {hf:null, label:"eerdere berekening geblokkeerd"}
+            : getHF(calcPrev?.hgAdjusted || calcPrev?.hgRaw, startOiMin);
+          if(startHF.hf !== 1){
+            const separateUnits = u.events.map(e => Object.assign(unitFromEvents([e], dataset), {
+              meterRuleStartRejected:true,
+              meterRuleStartHF:startHF.hf,
+              meterRuleStartLabel:startHF.label,
+              rejectedMeterRule:u.appliedRule
+            }));
+            pending.push(...separateUnits);
+            pending.sort((a,b)=>a.start-b.start);
+            continue;
+          }
+        }
+        const r = calcUnit(u, calcPrev, {prevBlockedByChain:!!chainBlocker});
         Object.assign(u, r);
         if(chainBlocker){
           // De korte-OI-oorzaak draagt de code van de lege tabelcel die de keten
@@ -1996,7 +2016,7 @@
     }
   }
 
-  function calcUnit(u, prev){
+  function calcUnit(u, prev, context={}){
     const res = {messages:[], severity:0, codes:[], oiMin:null, hf:null, hfLabel:"-", edt:null, ndl:null, hgRaw:null, hgAdjusted:null, calcType:"", safetyStop:false, chainUnreliable:false};
     if((u.events || []).some(e=>e.timerNeedsCheck)){
       addMsg(res,1,"Actieve timer is langer dan 8 uur; controleer starttijd of zet de duik boven/einde.");
@@ -2017,6 +2037,16 @@
       return res;
     }
 
+    if(u.meterRuleStartRejected){
+      const rejectedRule = shallowRules[u.rejectedMeterRule];
+      const startHF = u.meterRuleStartHF == null
+        ? `niet bepaald (${u.meterRuleStartLabel || "onbekende uitgangssituatie"})`
+        : fmtHF(u.meterRuleStartHF);
+      addMsg(res,1,`${rejectedRule?.label || "Meterregel"} niet toegepast: inkomende HF bij de eerste duik van deze meterregelsessie is ${startHF} en moet 1,0 zijn; normale beoordeling gebruikt.`);
+      if(context.prevBlockedByChain) return res;
+      if(u.meterRuleStartHF == null && !prev) return res;
+    }
+
     if(!u.appliedRule && u.shallowRuleKey && u.rule !== "auto"){
       const selectedRule = shallowRules[u.shallowRuleKey];
       if(selectedRule && u.mddMax > selectedRule.maxDepth){
@@ -2027,23 +2057,38 @@
 
     if(u.appliedRule){
       const rule = shallowRules[u.appliedRule];
-      res.calcType = rule.label;
-      if(u.rule !== "auto" && u.mddMax > rule.maxDepth){
-        addMsg(res,2,`${rule.label} gekozen, maar MDD ${u.mddMax.toFixed(1)} m is dieper dan ${rule.maxDepth} m.`,"INVALID_INPUT");
-        if(u.appliedRule === "s12") addMsg(res,1,over12PlannedGuidance);
+      const startHF = getHF(prev?.hgAdjusted || prev?.hgRaw, res.oiMin);
+      if(startHF.hf !== 1){
+        const startHFText = startHF.hf == null ? `niet bepaald (${startHF.label})` : fmtHF(startHF.hf);
+        res.appliedRule = null;
+        res.meterRuleApplied = false;
+        res.meterRuleStartRejected = true;
+        res.meterRuleStartHF = startHF.hf;
+        res.meterRuleStartLabel = startHF.label;
+        res.rejectedMeterRule = u.appliedRule;
+        addMsg(res,1,`${rule.label} niet toegepast: inkomende HF bij de eerste duik van deze meterregelsessie is ${startHFText} en moet 1,0 zijn; normale beoordeling gebruikt.`);
+        if(startHF.hf == null && res.oiMin == null){
+          addMsg(res,2,"Inkomende HF voor de meterregelsessie kan niet betrouwbaar worden bepaald; berekening geblokkeerd.","INVALID_INPUT");
+          return res;
+        }
+      }else{
+        res.calcType = rule.label;
+        if(u.rule !== "auto" && u.mddMax > rule.maxDepth){
+          addMsg(res,2,`${rule.label} gekozen, maar MDD ${u.mddMax.toFixed(1)} m is dieper dan ${rule.maxDepth} m.`,"INVALID_INPUT");
+          if(u.appliedRule === "s12") addMsg(res,1,over12PlannedGuidance);
+        }
+        if(u.dtTotal > rule.totalLimit){
+          addMsg(res,2,`Totale duiktijd binnen meterregel ${u.dtTotal} min overschrijdt ${rule.label} (${rule.totalLimit} min).`,"BOTTOM_TIME_EXCEEDS_METER_RULE");
+        }
+        res.hf = 1;
+        res.hfLabel = "start HF 1,0";
+        res.edt = u.dtTotal;
+        res.ndl = rule.totalLimit;
+        res.hgRaw = getHG(rule.maxDepth, u.dtTotal);
+        if(!res.hgRaw) addMsg(res,2,"HG kan niet uit Airtabel 1 worden bepaald voor deze duiktijd.","BOTTOM_TIME_EXCEEDS_TABLE");
+        res.hgAdjusted = res.hgRaw;
+        return res;
       }
-      if(u.dtTotal > rule.totalLimit){
-        addMsg(res,2,`Totale duiktijd binnen meterregel ${u.dtTotal} min overschrijdt ${rule.label} (${rule.totalLimit} min).`,"BOTTOM_TIME_EXCEEDS_METER_RULE");
-      }
-      if(prev && res.oiMin != null && res.oiMin <= 1080) addMsg(res,1,`${rule.label} vereist start met HF 1,0; vorige HG is nog niet volledig vervallen.`);
-      res.hf = 1;
-      res.hfLabel = "start HF 1,0";
-      res.edt = u.dtTotal;
-      res.ndl = rule.totalLimit;
-      res.hgRaw = getHG(rule.maxDepth, u.dtTotal);
-      if(!res.hgRaw) addMsg(res,2,"HG kan niet uit Airtabel 1 worden bepaald voor deze duiktijd.","BOTTOM_TIME_EXCEEDS_TABLE");
-      res.hgAdjusted = res.hgRaw;
-      return res;
     }
     if(u.mddMax > 12){
       if(u.rule === "auto") addMsg(res,2,"Dieper dan 12 meter: 6/9/12-meterregel niet toepasbaar. Gebruik DCIEM standaard en beoordeel de duiken afzonderlijk.","INVALID_INPUT");
@@ -2205,7 +2250,10 @@
       arr.sort((a,b)=>(a.surface||a.start)-(b.surface||b.start));
       let prev = null, period = [];
       const flush = () => {
-        const meter = period.filter(e => daypartRule(e.rule, e.mdd) && Number.isFinite(e.dtMin));
+        const meter = period.filter(e => {
+          const unit = unitByEvent.get(e.id);
+          return !unit?.meterRuleStartRejected && daypartRule(e.rule, e.mdd) && Number.isFinite(e.dtMin);
+        });
         if(!meter.length){ period = []; return; }
         const sumDt = meter.reduce((s,e)=>s+e.dtMin, 0);
         const maxD = Math.max(...meter.map(e=>Number.isFinite(e.mdd)?e.mdd:0));
@@ -4683,6 +4731,56 @@
     push("meterregel","Eén losse duik op 11 m toont Tabel 1 - 12 m tabeldiepte", "Tabel 1 - 12 m tabeldiepte", calculationLabel(single11), !single11?.appliedRule && calculationLabel(single11)==="Tabel 1 - 12 m tabeldiepte");
     const sameDiver11 = testState({planning:[ev("D1","09:30:00",15,11,"1","auto"),ev("D1","10:00:00",10,8,"1","auto")]},()=>calcDataset("planning").units[0]);
     push("meterregel","D1 twee keer tot 12 m-bereik wordt 12-meterregel", "s12 / 25 min", `${sameDiver11?.appliedRule} / ${sameDiver11?.dtTotal} min`, sameDiver11?.appliedRule==="s12" && sameDiver11?.dtTotal===25);
+    push("meterregel","Geldige 6-meterregel start werkelijk met HF 1,0", "s6 / HF 1,0 / EDT 25", `${sameDiver5?.appliedRule||"geen"} / HF ${fmtHF(sameDiver5?.hf)} / EDT ${sameDiver5?.edt}`, sameDiver5?.appliedRule==="s6" && sameDiver5?.hf===1 && sameDiver5?.edt===25 && sameDiver5?.calcType==="6-meterregel");
+    push("meterregel","Bestaande geldige 6/9/12-meterregelsessies blijven werken", "s6/s9/s12 met HF 1,0", `${sameDiver5?.appliedRule}/${sameDiver8?.appliedRule}/${sameDiver11?.appliedRule} met HF ${fmtHF(sameDiver5?.hf)}/${fmtHF(sameDiver8?.hf)}/${fmtHF(sameDiver11?.hf)}`, [sameDiver5,sameDiver8,sameDiver11].every((u,i)=>u?.appliedRule===["s6","s9","s12"][i] && u?.hf===1 && u?.edt===25));
+
+    const rejectedMeterStart = depth => testState({planning:[
+      {...ev("D1","08:00:00",30,9,"1","normal"),id:`meterPrev${depth}`},
+      {...ev("D1","09:31:00",10,depth,"1","auto"),id:`meterCandidate${depth}a`},
+      {...ev("D1","10:01:00",10,depth,"1","auto"),id:`meterCandidate${depth}b`}
+    ]},()=>{
+      const units = calcDataset("planning").units;
+      const candidateIds = new Set([`meterCandidate${depth}a`,`meterCandidate${depth}b`]);
+      return units.filter(u=>(u.events||[]).some(e=>candidateIds.has(e.id)));
+    });
+    for(const depth of [6,9,12]){
+      const rejected = rejectedMeterStart(depth);
+      push("meterregel",`${depth}-meterregel met inkomende HF 1,1 wordt werkelijk niet toegepast`, "2 normale units, geen toegepaste meterregel", `${rejected?.length} units / ${rejected?.map(u=>u.appliedRule||"normaal").join("/")}`, rejected?.length===2 && rejected.every(u=>!u.appliedRule && !isMeterRuleApplied(u) && u.calcType==="normaal" && !calculationLabel(u).includes("meterregel")));
+      push("meterregel",`${depth}-meterregel zet afgewezen start-HF niet op 1`, "eerste HF 1,1; normale route; afwijsmelding", `HF ${fmtHF(rejected?.[0]?.hf)} / ${rejected?.[0]?.calcType||"-"} / melding ${/(niet toegepast)/.test((rejected?.[0]?.messages||[]).join(" | "))}`, rejected?.[0]?.hf===1.1 && rejected?.[0]?.hf!==1 && rejected?.[0]?.calcType==="normaal" && /(niet toegepast)/.test((rejected?.[0]?.messages||[]).join(" | ")));
+      push("meterregel",`${depth}-meterregel gebruikt na afwijzing geen cumulatieve sessie-EDT`, "2 x DT 10; eerste EDT 11; geen unit met 20 min", `${rejected?.map(u=>`DT ${u.dtTotal}/EDT ${u.edt}`).join(" | ")}`, rejected?.length===2 && rejected.every(u=>u.events?.length===1 && u.dtTotal===10 && u.edt!==20) && rejected[0]?.edt===11);
+    }
+
+    const rejectedBlocked = testState({planning:[
+      {...ev("D1","08:00:00",30,9,"1","normal"),id:"meterBlockedPrev"},
+      {...ev("D1","08:45:00",10,6,"1","auto"),id:"meterBlockedA"},
+      {...ev("D1","09:10:00",10,6,"1","auto"),id:"meterBlockedB"}
+    ]},()=>{
+      const units = calcDataset("planning").units;
+      return units.filter(u=>(u.events||[]).some(e=>e.id==="meterBlockedA" || e.id==="meterBlockedB"));
+    });
+    push("meterregel","Afgewezen meterregel behoudt bestaande BLOCKED-route als HF niet betrouwbaar is", "eerste EMPTY_TABLE_CELL, vervolg chainBlocked, geen meterregel", `eerste sev ${rejectedBlocked?.[0]?.severity} codes ${(rejectedBlocked?.[0]?.codes||[]).join(",")} / vervolg blocked ${!!rejectedBlocked?.[1]?.chainBlockedBy}`, rejectedBlocked?.length===2 && rejectedBlocked[0]?.severity===2 && (rejectedBlocked[0]?.codes||[]).includes("EMPTY_TABLE_CELL") && rejectedBlocked[0]?.hf==null && !!rejectedBlocked[1]?.chainBlockedBy && rejectedBlocked.every(u=>!u.appliedRule));
+
+    const rejectedNumericChain = testState({planning:[
+      {...ev("D1","08:00:00",20,9,"1","normal"),id:"meterNumericPrev"},
+      {...ev("D1","09:21:00",151,12,"1","auto"),id:"meterNumericA"},
+      {...ev("D1","12:00:00",10,12,"1","auto"),id:"meterNumericB"}
+    ]},()=>{
+      const units = calcDataset("planning").units;
+      return {
+        first:units.find(u=>(u.events||[]).some(e=>e.id==="meterNumericA")),
+        next:units.find(u=>(u.events||[]).some(e=>e.id==="meterNumericB"))
+      };
+    });
+    push("meterregel","P1: numeriek afgewezen meterregelstart bewaart HF 1,1", "start-HF 1,1, geen meterregel", `start-HF ${fmtHF(rejectedNumericChain.first?.meterRuleStartHF)} / applied ${rejectedNumericChain.first?.appliedRule||"geen"}`, rejectedNumericChain.first?.meterRuleStartRejected===true && rejectedNumericChain.first?.meterRuleStartHF===1.1 && !rejectedNumericChain.first?.appliedRule);
+    push("meterregel","P1: eerste losse terugvalduik blokkeert de rekenketen", "severity 2, BOTTOM_TIME_EXCEEDS_TABLE", `severity ${rejectedNumericChain.first?.severity} / codes ${(rejectedNumericChain.first?.codes||[]).join(",")}`, rejectedNumericChain.first?.severity===2 && (rejectedNumericChain.first?.codes||[]).includes("BOTTOM_TIME_EXCEEDS_TABLE") && !rejectedNumericChain.first?.chainBlockedBy);
+    push("meterregel","P1: ketengeblokkeerde vervolgduik houdt alle rekenwaarden leeg", "chainBlockedBy; HF/EDT/NDL/HG null; severity 2; geen meterregel", `blocked ${!!rejectedNumericChain.next?.chainBlockedBy} / HF ${rejectedNumericChain.next?.hf} (${rejectedNumericChain.next?.hfLabel}) / EDT ${rejectedNumericChain.next?.edt} / NDL ${rejectedNumericChain.next?.ndl} / HG ${rejectedNumericChain.next?.hgRaw}/${rejectedNumericChain.next?.hgAdjusted} / severity ${rejectedNumericChain.next?.severity}`, !!rejectedNumericChain.next?.chainBlockedBy && rejectedNumericChain.next?.hf===null && rejectedNumericChain.next?.hfLabel==="-" && rejectedNumericChain.next?.edt===null && rejectedNumericChain.next?.ndl===null && rejectedNumericChain.next?.hgRaw===null && rejectedNumericChain.next?.hgAdjusted===null && rejectedNumericChain.next?.severity===2 && !rejectedNumericChain.next?.appliedRule);
+    const p1OrdinaryFirst = testState({planning:[{...ev("D2","14:00:00",10,9,"1","normal"),id:"p1OrdinaryFirst"}]},()=>calcDataset("planning").units[0]);
+    push("meterregel","P1: gewone eerste duik houdt HF 1", "HF 1, eerste duik, EDT 10", `HF ${fmtHF(p1OrdinaryFirst?.hf)} / ${p1OrdinaryFirst?.hfLabel} / EDT ${p1OrdinaryFirst?.edt}`, p1OrdinaryFirst?.hf===1 && p1OrdinaryFirst?.hfLabel==="eerste duik" && p1OrdinaryFirst?.edt===10);
+    const p1Reset = testState({planning:[
+      {...ev("D2","08:00:00",20,9,"1","normal"),id:"p1ResetPrev"},
+      {id:"p1ResetNext",diverId:"D2",start:"2026-05-24T02:22:00",dtMin:10,mdd:9,daypart:"1",rule:"normal",notes:"zelftest"}
+    ]},()=>calcDataset("planning").units.find(u=>(u.events||[]).some(e=>e.id==="p1ResetNext")));
+    push("meterregel","P1: OI boven 18 uur blijft resetten naar HF 1", "OI 1081, HF 1, OI > 18:00", `OI ${p1Reset?.oiMin} / HF ${fmtHF(p1Reset?.hf)} / ${p1Reset?.hfLabel}`, p1Reset?.oiMin===1081 && p1Reset?.hf===1 && p1Reset?.hfLabel==="OI > 18:00");
     // Luchtverbruik-indicatie: ademminuutvolume x omgevingsdruk (planningsindicatie, geen limiet).
     push("planning","Luchtindicatie 9 m: L 40 l/min x 1,9 ata = 76", "76", String(airUsePerMin(9)?.low), airUsePerMin(9)?.low===76);
     push("planning","Luchtindicatie 9 m: H 72 l/min x 1,9 ata = 137", "137", String(airUsePerMin(9)?.high), airUsePerMin(9)?.high===137);
