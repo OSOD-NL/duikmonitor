@@ -42,17 +42,48 @@ Kern van de DCIEM-rekenmotor. Bepaalt onder andere:
 - herhalings-NDL uit Tabel 4b;
 - blokkades bij ontbrekende of onberekenbare invoer.
 
+### `calcCombinedUnit`
+
+Berekent een gecombineerde duik van twee of drie feitelijke duikmomenten. De
+eerste stap leest de HG uit Airtabel 1. Bij een volgend moment op dezelfde
+tabeldiepte wordt de effectieve duiktijd opgeteld; bij een andere tabeldiepte
+wordt uitsluitend de overeenkomstige duiktijd voor de voorgaande HG uit
+Airtabel 1 gebruikt. Er wordt niet geïnterpoleerd. Een ontbrekende cel, een
+vierde gekoppeld moment, een start met inkomende HF anders dan 1,0 of een
+gezamenlijke uitkomst buiten de no-deco-envelop blokkeert de berekening. De
+functie leidt nooit een decompressieschema af.
+
 ### `buildUnits` en `calcDataset`
 
-Groeperen duikmomenten per duiker/dagdeel en bepalen of meterregels of normale DCIEM-berekening gelden. Hier zit de scheiding tussen 6/9/12-meterregel, afzonderlijke duiken en >12m-situaties. Hier zit ook de ketenbewaking voor herhalingsduiken: een eenheid die niet volledig tabelmatig berekend is, geen boven-tijd heeft of als niet-ketenbetrouwbaar is gemarkeerd (`chainUnreliable`, gezet bij een oppervlakte-interval onder 15 minuten) levert geen ketenwaarde; de vervolgduik gaat dan op handmatige beoordeling tot de 18-uursreset.
+Normaliseren en sorteren alle duikmomenten per duiker op start- en boventijd.
+Dagdeel is geen rekengrens. De reducer bouwt vervolgens expliciete
+rekeneenheden van type `single`, `combined` of `meter`:
+
+- een geldige 6-, 9- of 12-meterregelsessie heeft voorrang, mag alleen met
+  inkomende HF 1,0 starten en gebruikt de diepste werkelijke MDD voor de regel;
+- buiten een geldige meterregelsessie vormen opeenvolgende momenten met OI
+  korter dan 15 minuten één gecombineerde duik van maximaal drie momenten;
+- OI vanaf 15 minuten volgt de gewone normale/herhalingsroute;
+- na meer dan 18 uur wordt de keten vóór de routekeuze gereset;
+- overlap of een eerdere onbetrouwbare uitkomst blokkeert de keten.
+
+Een dagdeelwisseling splitst geen gecombineerde duik of meterregelsessie. Voor
+presentatie wordt een dagdeeloverschrijdende rekeneenheid één keer onder het
+startdagdeel getoond, met alle feitelijke momenten en hun eigen dagdeel erbij.
 
 ### `applyAscentLimits`
 
 Bewaking bovenop de DCIEM-rekenmotor. Controleert opstijgingslimieten en de >12m-procedurelaag. Deze laag is bewust apart gehouden van de tabellen.
 
-### `applyMeterRulePeriodTotals`
+### `collectMeterRuleSession`
 
-Veiligheidsnet bovenop de dagdeel-gegroepeerde meterregelberekening in `calcUnit`. Telt de duiktijden van meterregelduiken per duiker op tijdsbasis op binnen één duikperiode (een rustpauze van minimaal 1 uur start een nieuwe periode). Wanneer de opgetelde tijd over meer dan één rekeneenheid (bijvoorbeeld twee dagdelen) de meterregellimiet overschrijdt, voegt deze laag een waarschuwing toe. De laag verandert geen bestaande berekening en meldt bewust niet wanneer alles binnen één dagdeel-eenheid valt, omdat `calcUnit` dat geval al afvangt.
+Verzamelt een chronologische meterregelsessie voordat `calcUnit` rekent. De
+sessie loopt over dagdelen heen, telt alle feitelijke duiktijden op en schuift
+naar 6, 9 of 12 meter op basis van de diepste werkelijke MDD. Wanneer de
+inkomende HF bij een later moment opnieuw exact 1,0 is, eindigt de bestaande
+sessie en kan een nieuwe sessie beginnen. Een afgewezen sessiestart krijgt geen
+kunstmatige HF 1,0 en valt niet stilzwijgend terug op een cumulatieve
+meterregeluitkomst.
 
 ### `repeatProjection`
 
@@ -70,7 +101,10 @@ Compatibiliteitsreparatie voor oude live-records zonder timestamp. Sinds de time
 
 - CSV gebruikt `csvSafe()` tegen formule-injectie.
 - XLSX gebruikt `inlineStr` en XML-escaping, zodat formuleachtige invoer als tekst wordt opgeslagen.
-- JSON-export bevat state-data en is bedoeld als lokale overdracht/back-up.
+- De registratie-JSON en -XLSX scheiden feitelijke duikmomenten van de
+  gezamenlijke rekeneenheid. Een gecombineerde effectieve DT/HG wordt niet op
+  ieder fysiek moment geplakt.
+- JSON-back-up bevat state-data en is bedoeld als lokale overdracht/back-up.
 
 ## 4. Tabelwaarden en diep bevroren bron
 
@@ -101,6 +135,9 @@ De browserfunctie `runSelfTests()` draait in de app zelf en wordt door `scripts/
 
 - tabelwaarden en HF-keuzes;
 - meterregelgrenzen;
+- chronologische rekeneenheden, dagdeeloverschrijding en OI-grenzen 14/15/16;
+- gecombineerde duiken met gelijke en verschillende tabeldiepten, lege
+  overeenkomstige cellen, maximaal drie momenten en no-deco-blokkades;
 - blokkades bij ontbrekende invoer;
 - >12m-procedurelaag;
 - live-timer en timestampgedrag;
@@ -189,9 +226,11 @@ Belangrijke functies en aandachtspunten:
   de DPL staat bij de daggegevens.
 - **HG-aanpassing** is informatief (severity 0), niet "controle vereist".
 - **Vaste codes D1 t/m D12**; betekenis staat in de vrije aanduiding, niet in de codering. De `active`-vlag bepaalt welke duikers standaard in planning, live bediening en overzichten verschijnen. Bestaande regels met een inactieve duiker blijven zichtbaar.
-- **DCIEM-onderbouwing als redeneerregel** (`dciemSummary`): `DD · HG voor MDD,
-  EDT = DT × HF, ophoging met reden`. Tabeldiepte tussen haakjes alleen bij
-  afwijking van de ingevulde MDD. Afkortingen via een info-i.
+- **DCIEM-onderbouwing als redeneerregel** (`dciemSummary`): expliciet type
+  normale duik, herhalingsduik, gecombineerde duik of meterregelsessie. Bij een
+  gecombineerde duik blijven alle feitelijke tijden, MDD's en DT's zichtbaar
+  naast de gezamenlijke effectieve duiktijd, tabeldiepte en HG. Afkortingen via
+  een info-i.
 - **Planningsprofiel** (`renderWerkplan`, `airUsePerMin`): per geplande duik de
   meterregel-totaaltijd en een L/H-luchtindicatie (40/72 l/min × omgevingsdruk),
   nadrukkelijk een planningsindicatie en geen limiet; met werkplan-print.
@@ -202,4 +241,13 @@ Belangrijke functies en aandachtspunten:
 
 ## 10. OSOD-laag
 
-Sinds v1.2.0 bevat de app een beschrijvende laag voor de Open Standaard Operationele Duikregistratie (OSOD) v0.1. Kern: `osodRecordFromEvent` bouwt per duik-event een OSOD-record op uit het bestaande interne model en de rekeneenheid; `osodCalculationFromUnit` vertaalt ernstniveau en codes van de motor naar het `calculation`-blok (status, resultValid, blockingReasons) en draagt sinds v1.3.0 in `engine.tableFingerprintSha256` de sha256 over de canonieke, sleutel-gesorteerde JSON-weergave van de diep bevroren DCIEM-bron (`osodTableFingerprintSha256`, zichtbaar in het verificatiescherm); `osodValidateRecord` is de ingebouwde doelvalidator, inclusief de niet-leeg-eisen van het schema; `exportOsodJson` en `importOsodRecords` verzorgen de uitwisseling, waarbij de import sinds v1.3.0 een harde scope-beperking hanteert: kandidaat-records worden na opname herbouwd (`osodMeaningDiff`) en buiten-scope-records worden geweigerd in plaats van herschreven. Blokkerende meldingen in `calcUnit`, `applyAscentLimits`, `applyMeterRulePeriodTotals` en `applyOperationalStatus` dragen daarvoor een machineleesbare code via de uitgebreide `addMsg(obj, sev, msg, code)`; codes worden alleen vastgelegd bij ernst 2. De HG-aanpassing bij herhalingsduiken staat in de zuivere helper `osodAdjustHG` en wordt door `calcUnit` aangeroepen; het gedrag is identiek aan de eerdere inline-variant. De laag berekent zelf niets en wijzigt geen tabel- of regelwaarden; zij leest de uitkomsten van de bestaande motor. Zie `docs/OSOD.md` voor de mapping en beperkingen.
+Sinds v1.2.0 bevat de app een beschrijvende laag voor de Open Standaard Operationele Duikregistratie (OSOD) v0.1. Kern: `osodRecordFromEvent` bouwt per duik-event een OSOD-record op uit het bestaande interne model en de rekeneenheid; `osodCalculationFromUnit` vertaalt ernstniveau en codes van de motor naar het `calculation`-blok (status, resultValid, blockingReasons) en draagt sinds v1.3.0 in `engine.tableFingerprintSha256` de sha256 over de canonieke, sleutel-gesorteerde JSON-weergave van de diep bevroren DCIEM-bron (`osodTableFingerprintSha256`, zichtbaar in het verificatiescherm); `osodValidateRecord` is de ingebouwde doelvalidator, inclusief de niet-leeg-eisen van het schema. Blokkerende meldingen in `calcUnit`, `calcCombinedUnit`, `applyAscentLimits` en `applyOperationalStatus` dragen een machineleesbare code via `addMsg(obj, sev, msg, code)`; codes worden alleen vastgelegd bij ernst 2.
+
+OSOD v0.1 heeft geen betekenisbehoudend model voor meerdere afzonderlijke
+duikfeiten met één gezamenlijke gecombineerde rekenuitkomst. Daarom markeert
+`osodCalculationFromUnit` zo'n uitkomst als `BLOCKED` met
+`UNSUPPORTED_COMBINED_DIVE`, en blokkeert `exportOsodJson` de volledige export
+vóór UUID-toekenning, opslag of download. De gewone registratie-JSON/XLSX kan
+dit wel dragen via een aparte rekeneenhedenlaag. De DCIEM-tabellen, bronfixture
+en rekenbronfingerprint zijn hiervoor niet gewijzigd. Zie `docs/OSOD.md` voor
+de overige mapping en beperkingen.

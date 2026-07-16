@@ -2,6 +2,72 @@
 
 Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 
+## [1.30.0] - 2026-07-17
+
+### Veiligheidswijziging
+
+- De rekenmotor verwerkt duikmomenten voortaan per duiker in volledige
+  chronologische volgorde. Dagdeel is alleen registratie- en
+  presentatie-informatie en splitst geen DCIEM-keten, gecombineerde duik of
+  meterregelsessie meer.
+- Geldige 6-, 9- en 12-meterregelsessies hebben voorrang, mogen alleen met
+  inkomende HF 1,0 starten, gebruiken de diepste werkelijke MDD voor de regel
+  en lopen over een dagdeelwisseling heen. Wanneer de inkomende HF later weer
+  exact 1,0 is, begint een nieuwe sessie.
+- Buiten een geldige meterregelsessie worden twee of drie opeenvolgende
+  duikmomenten met een oppervlakte-interval korter dan 15 minuten als één
+  gecombineerde duik berekend. Bij gelijke tabeldiepte telt de effectieve tijd
+  door; bij een dieptewisseling wordt exact de overeenkomstige duiktijd voor de
+  actuele HG uit Airtabel 1 gebruikt, zonder interpolatie.
+- De gecombineerde route blokkeert bij overlap, ongeldige of nul-DT, een start
+  die al een herhalingsfactor anders dan 1,0 heeft, een ontbrekende
+  overeenkomstige tabelcel, een vierde gekoppeld moment of een gezamenlijke
+  effectieve tijd buiten de no-deco-envelop. Er wordt geen decompressieschema
+  afgeleid. Een oude blokkade vervalt pas na meer dan 18 uur en wordt vóór de
+  keuze van de volgende rekeneenheid gereset.
+
+### Presentatie en uitwisseling
+
+- Scherm, rapport en registratie benoemen expliciet normale duik,
+  herhalingsduik, gecombineerde duik en meterregelsessie. Fysieke tijden, MDD's
+  en DT's blijven per moment zichtbaar; gezamenlijke effectieve DT,
+  tabeldiepte en HG staan alleen bij de rekeneenheid. `start-HF` is zichtbaar
+  onderscheiden van de gewone herhalingsfactor.
+- Registratie-JSON bevat naast de fysieke registratieregels een aparte
+  `berekeningen`-laag met leden, rekenregel, fysieke som, overeenkomstige
+  duiktijden, effectieve uitkomst en blokkades. Registratie-XLSX maakt dezelfde
+  scheiding. Een dagdeeloverschrijdende rekeneenheid wordt in het rapport één
+  keer onder het startdagdeel getoond.
+- Afnemers die XLSX-kolommen op naam verwerken moeten rekening houden met de
+  explicietere moment- en rekeneenheidkolommen; onder meer registratievorm, HG,
+  HF en EDT zijn nu als momentwaarde of gezamenlijke waarde benoemd.
+- OSOD v0.1 kan losse duikfeiten met één gezamenlijke gecombineerde uitkomst
+  niet betekenisbehoudend vastleggen. De OSOD-export blokkeert daarom met
+  `UNSUPPORTED_COMBINED_DIVE` vóór UUID-toekenning, lokale opslag of download.
+
+### Bron en validatie
+
+- Bronfeit: OI korter dan 15 minuten geldt volgens IWOD 002 (2019) § 2300 en
+  WOD v2.0 § 11.5.1 als gecombineerde duik; Tabel 4a is dan niet toepasbaar.
+- Bronfeit: de meterregel telt feitelijke DT op en mag alleen bij HF 1,0
+  beginnen. De chronologische reducer, het maximum van drie automatisch
+  gecombineerde momenten en blokkeren zonder interpolatie of decompressieroute
+  zijn expliciete, conservatieve projectbesluiten en broninterpretaties.
+- De ingebouwde zelftest is uitgebreid van 470 naar 498 controles. Toegevoegd
+  zijn onder meer OI 14/15/16, twee en drie momenten op gelijke en verschillende
+  diepten, lege cellen, gezamenlijke no-deco-overschrijding, overlap, DT 0,
+  dagdeelwisseling, meterregelvoorrang en -splitsing, 18-uursreset,
+  chronologische invoervolgorde en JSON/XLSX/OSOD-uitvoer.
+- Appversielabel verhoogd naar v1.30.0.
+
+### Niet gewijzigd
+
+- De DCIEM-tabelwaarden, Airtabel 1, Tabel 4a, Tabel 4b,
+  meterregel-totaallimieten, bronfixture, Tabel 4a-fixture en
+  rekenbronfingerprint zijn ongewijzigd. Ook localStorage, import, CSP,
+  netwerkgedrag en offline werking zijn niet gewijzigd. Er is geen migratie van
+  bestaande browserdata nodig.
+
 ## [1.29.0] - 2026-07-05
 
 ### Toegevoegd
