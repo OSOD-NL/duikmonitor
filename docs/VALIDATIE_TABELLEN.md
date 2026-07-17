@@ -99,11 +99,66 @@ Het bronvoorbeeld (voorafgaande duik HG D, HI minder dan 6 uur, uitgevoerde duik
 
 De tekst van `over12UnplannedProcedure` is woordelijk afgestemd op de bron. De eerdere formulering "melden/voorleggen aan DMC/duikerarts" is vervangen door "het voorval melden aan het hoofd van het Duikmedisch Centrum (HDMC)", conform logboek p. 31. De rekenlogica en de drempelwaarden zijn hierbij niet gewijzigd.
 
-## Aanscherping v1.27.0: ketenwaarde bij OI onder 15 minuten
+## Historische aanscherping v1.27.0-v1.29.0: ketenwaarde bij OI onder 15 minuten
 
 Bron: IWOD 002 (1 april 2019) par. 2300 en Werkinstructie WOD v2.0 par. 11.5.1: duiken met een oppervlakte-interval korter dan 15 minuten gelden samen als een gecombineerde duik; tabel 4a is op zo'n interval niet van toepassing.
 
-De monitor toonde bij zo'n korte-OI-duik al de juiste waarschuwing en berekende informatief een HG uit alleen de eigen duiktijd van die duik. Die HG onderschat per definitie de restbelasting van de gecombineerde duik. Tot en met v1.26.0 werd die onderschatte HG stilzwijgend als ketenwaarde gebruikt voor een volgende herhalingsduik, waardoor die vervolgduik een te gunstige HF, herhalings-NDL en status kon tonen. Vanaf v1.27.0 markeert de rekenmotor de korte-OI-duik als niet-ketenbetrouwbaar (`chainUnreliable`): de vervolgduik gaat via de bestaande chainBlocker-route op handmatige beoordeling (buitengrens, `INVALID_INPUT`), tot de 18-uursreset. De korte-OI-duik zelf blijft ongewijzigd zichtbaar met dezelfde waarschuwing; er is geen tabelwaarde gewijzigd en de bronfingerprint is ongewijzigd. Zelftests dekken de blokkade, de markering en het herstel na 18 uur.
+De monitor toonde bij zo'n korte-OI-duik al de juiste waarschuwing en berekende informatief een HG uit alleen de eigen duiktijd van die duik. Die HG onderschat per definitie de restbelasting van de gecombineerde duik. Tot en met v1.26.0 werd die onderschatte HG stilzwijgend als ketenwaarde gebruikt voor een volgende herhalingsduik, waardoor die vervolgduik een te gunstige HF, herhalings-NDL en status kon tonen. Van v1.27.0 tot en met v1.29.0 markeerde de rekenmotor de korte-OI-duik daarom als niet-ketenbetrouwbaar (`chainUnreliable`): de vervolgduik ging via de `chainBlocker`-route op handmatige beoordeling tot de 18-uursreset. Deze tijdelijke blokkaderoute voorkwam onderschatting, maar berekende de gecombineerde duik zelf nog niet.
+
+## Uitwerking v1.30.0: chronologische rekeneenheden en gecombineerde duiken
+
+Vanaf v1.30.0 verwerkt de motor alle duikmomenten per duiker in één
+chronologische reducer. Dagdeel blijft registratie- en presentatie-informatie en
+splitst de rekenketen niet. De reducer kiest in deze volgorde:
+
+1. een geldige 6-, 9- of 12-meterregelsessie, uitsluitend met inkomende HF 1,0;
+2. buiten die route een gecombineerde duik bij opeenvolgende OI's korter dan
+   15 minuten;
+3. vanaf OI 15 minuten de gewone normale of herhalingsduik.
+
+Een gecombineerde duik bevat twee of drie feitelijke momenten. Bij dezelfde
+tabeldiepte telt de effectieve duiktijd door. Bij een andere tabeldiepte leest
+de motor voor de actuele HG uitsluitend de overeenkomstige duiktijd uit
+Airtabel 1 en telt daar de feitelijke DT van het volgende moment bij op. Een
+lege broncel wordt niet geïnterpoleerd. Het resultaat wordt opnieuw als HG op
+de nieuwe tabeldiepte afgelezen. Alle fysieke tijden, MDD's en DT's blijven
+afzonderlijk geregistreerd; alleen effectieve duiktijd, tabeldiepte en eind-HG
+zijn gezamenlijke rekenwaarden.
+
+De berekening blokkeert onder andere bij overlap, ontbrekende of nul-DT, een
+vierde gekoppeld moment, een start die al een herhalingsfactor anders dan 1,0
+heeft, een ontbrekende overeenkomstige tabelcel of een gezamenlijke effectieve
+tijd buiten de no-deco-envelop. Er wordt in die gevallen geen HG doorgegeven en
+geen decompressieschema afgeleid. Na meer dan 18 uur wordt een oude blokkade
+vóór de keuze van een nieuwe rekeneenheid gereset. Die grens wordt ook binnen
+de meterregelcollector rechtstreeks op de chronologische OI bewaakt: 1080
+minuten blijft binnen de bestaande route, 1081 minuten start een nieuwe
+rekenreeks, ook als de voorlopige HG van de oude sessie ontbreekt.
+
+De inkomende start-HF wordt los van de geldige uitkomst-HF vastgelegd. Een
+bekende waarde blijft daardoor in scherm en registratie-uitvoer controleerbaar
+wanneer de rekeneenheid later blokkeert; een onbekende waarde blijft `null` of
+`-` en wordt niet kunstmatig op 1,0 gezet.
+
+### Bron en besluitvorming
+
+| Onderdeel | Classificatie | Vastlegging |
+|---|---|---|
+| OI korter dan 15 minuten geldt als gecombineerde duik; Tabel 4a is dan niet toepasbaar | Bronfeit | IWOD 002 (2019) § 2300 en WOD v2.0 § 11.5.1 |
+| Meterregel telt feitelijke DT op en mag alleen met HF 1,0 starten | Bronfeit | Logboek p. 30-31 en WOD v2.0 § 11.5 |
+| Dagdeel is geen rekenkundige ketengrens | Projectbesluit/modelcorrectie | Chronologie per duiker is leidend; dagdeel blijft metadata |
+| Maximaal drie momenten automatisch als één gecombineerde duik | Expliciet projectbesluit | Een vierde kort gekoppeld moment blokkeert met `COMBINED_DIVE_LIMIT_EXCEEDED` |
+| Overeenkomstige duiktijd bij dieptewisseling is exact de HG-drempel uit Airtabel 1; geen interpolatie | Broninterpretatie en conservatieve projectkeuze | Lege cel blokkeert met `EMPTY_TABLE_CELL` |
+| Buiten de no-deco-envelop geen decompressieschema afleiden | Conservatieve projectkeuze | Blokkade met `BOTTOM_TIME_EXCEEDS_TABLE` |
+| OSOD v0.1 exporteert geen gecombineerde rekeneenheid | Compatibiliteitsbesluit/open punt | OSOD kan losse feiten plus één gezamenlijke uitkomst niet betekenisbehoudend dragen; export blokkeert met `UNSUPPORTED_COMBINED_DIVE` vóór UUID/opslag/download |
+
+De vaste DCIEM-tabelwaarden, de bronfixture, de Tabel 4a-fixture en de
+rekenbronfingerprint zijn bij deze wijziging niet aangepast. De 509 ingebouwde
+zelftests dekken onder meer OI 14/15/16, twee en drie momenten, gelijke en
+verschillende diepten, lege cellen, no-deco-overschrijding, dagdeelwisseling,
+meterregelsessies, sessiesplitsing, de 18-uursgrens 1080/1081, functionele
+meterregelgrenzen 420/421, 210/211 en 120/121, auditwaarden bij blokkades,
+overlap en de OSOD-blokkade.
 
 ## Aanscherping v1.27.0: EDT in exacte tienden
 
