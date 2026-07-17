@@ -1813,7 +1813,7 @@
   }
   function unitFactorLabel(unit){
     if(!unit) return "-";
-    if(unit.unitType === "combined" || unit.unitType === "meter") return unit.hf == null ? "-" : `start-HF ${fmtHF(unit.hf)}`;
+    if(unit.unitType === "combined" || unit.unitType === "meter") return unit.incomingStartHf == null ? "-" : `start-HF ${fmtHF(unit.incomingStartHf)}`;
     return fmtHF(unit.hf);
   }
   function calculationLabel(unit){
@@ -1954,6 +1954,10 @@
       if(!meterRuleForEvent(next)) break;
       const gap = eventSurfaceInterval(session[session.length-1], next);
       if(gap == null || gap < 0) break;
+      // De resetgrens is rechtstreeks chronologisch: ook zonder voorlopige HG
+      // begint na meer dan 18 uur een nieuwe rekenreeks. Exact 18:00 blijft
+      // binnen de bestaande sessie-/tabelroute.
+      if(gap > 1080) break;
       const nextFactor = provisional.hg ? getHF(provisional.hg, gap) : {hf:null};
       // Zodra de inkomende HF opnieuw exact 1,0 is, begint het volgende moment
       // niet stilzwijgend in de oude sessie maar kan daar een nieuwe sessie starten.
@@ -2046,7 +2050,10 @@
         const chronologyOverlap = overlap != null && overlap < 0;
         const meterAttempt = chronologyOverlap ? null : collectMeterRuleSession(arr, index, prev, !!chainBlocker);
         if(meterAttempt?.events){
-          const meter = unitFromEvents(meterAttempt.events, dataset, {unitType:"meter"});
+          const meter = unitFromEvents(meterAttempt.events, dataset, {
+            unitType:"meter",
+            incomingStartHf:meterAttempt.startFactor?.hf
+          });
           calculate(meter);
           index += meterAttempt.events.length;
           continue;
@@ -2124,6 +2131,7 @@
       meterRuleApplied:unitType === "meter" && events.length > 1 && !!actualMeterRule,
       combinedCount:unitType === "combined" ? events.length : 0,
       combinedIntervals:unitType === "combined" ? events.slice(1).map((e,i)=>eventSurfaceInterval(events[i],e)) : [],
+      incomingStartHf:Number.isFinite(options.incomingStartHf) ? options.incomingStartHf : null,
       combinedEffectiveTimeMin:null,
       ascentCount:events.length,
       dtSource:[...new Set(events.map(e=>e.dtSource).filter(Boolean))].join(", ") || "-",
@@ -2149,6 +2157,7 @@
   function newCalculationResult(resultType="normale duik"){
     return {
       messages:[], severity:0, codes:[], oiMin:null, hf:null, hfLabel:"-",
+      incomingStartHf:null,
       edt:null, ndl:null, hgRaw:null, hgAdjusted:null, calcType:"",
       resultType, safetyStop:false, chainUnreliable:false,
       combinedEffectiveTimeMin:null, combinedTableDepth:null, combinedSteps:[]
@@ -2163,6 +2172,9 @@
       addMsg(res,2,"Een gecombineerde duik moet uit twee of drie chronologische duikmomenten bestaan.","COMBINED_DIVE_LIMIT_EXCEEDED");
       return res;
     }
+    const startFactor = incomingFactor(prev, events[0]);
+    res.oiMin = startFactor.oiMin;
+    res.incomingStartHf = startFactor.hf;
     if((events || []).some(e=>e.timerNeedsCheck)){
       addMsg(res,2,"Actieve timer moet eerst worden gecontroleerd voordat duikmomenten gecombineerd kunnen worden.","INVALID_INPUT");
       return res;
@@ -2187,8 +2199,6 @@
       }
     }
 
-    const startFactor = incomingFactor(prev, events[0]);
-    res.oiMin = startFactor.oiMin;
     if(startFactor.oiMin != null && startFactor.oiMin < 0){
       addMsg(res,2,"Gecombineerde duik geblokkeerd: de eerste duik begint vóór de voorgaande duik boven is.","INVALID_INPUT");
       return res;
@@ -2255,6 +2265,7 @@
 
   function calcUnit(u, prev, context={}){
     const res = newCalculationResult("normale duik");
+    if(u.unitType === "meter") res.incomingStartHf = u.incomingStartHf ?? null;
     if((u.events || []).some(e=>e.timerNeedsCheck)){
       addMsg(res,1,"Actieve timer is langer dan 8 uur; controleer starttijd of zet de duik boven/einde.");
       return res;
@@ -2296,6 +2307,7 @@
     if(u.appliedRule){
       const rule = shallowRules[u.appliedRule];
       const startHF = getHF(prev?.hgAdjusted || prev?.hgRaw, res.oiMin);
+      res.incomingStartHf = startHF.hf;
       if(startHF.hf !== 1){
         const startHFText = startHF.hf == null ? `niet bepaald (${startHF.label})` : fmtHF(startHF.hf);
         res.appliedRule = null;
@@ -3397,7 +3409,7 @@
       feitelijkeDtSomMin:Number.isFinite(unit.dtTotal) ? unit.dtTotal : null,
       oppervlakteIntervalVoorafMin:unit.oiMin ?? null,
       herhalingsfactor:(unit.unitType === "combined" || unit.unitType === "meter") ? null : unit.hf ?? null,
-      inkomendeStartHf:(unit.unitType === "combined" || unit.unitType === "meter") ? unit.hf ?? null : null,
+      inkomendeStartHf:(unit.unitType === "combined" || unit.unitType === "meter") ? unit.incomingStartHf ?? null : null,
       effectieveDuiktijdMin:unit.unitType === "combined" ? unit.combinedEffectiveTimeMin : unit.edt ?? null,
       tabelDiepteUitkomstM:unit.unitType === "combined" ? unit.combinedTableDepth : unit.tableDepth ?? null,
       herhalingsgroep:unit.hgAdjusted || unit.hgRaw || null,
@@ -3525,8 +3537,8 @@
         const momentIndex = Math.max(0, events.findIndex(x=>x.id===e.id));
         const calculationDepth = u?.unitType === "combined" ? u.combinedTableDepth : u?.tableDepth;
         const effective = u?.unitType === "combined" ? u.combinedEffectiveTimeMin : u?.edt;
-        const aggregateStartFactor = (u?.unitType === "combined" || u?.unitType === "meter") ? u?.hf ?? "" : "";
-        const aggregateRepeatFactor = aggregateStartFactor === "" ? u?.hf ?? "" : "";
+        const aggregateStartFactor = (u?.unitType === "combined" || u?.unitType === "meter") ? u?.incomingStartHf ?? "" : "";
+        const aggregateRepeatFactor = (u?.unitType === "combined" || u?.unitType === "meter") ? "" : u?.hf ?? "";
         rows.push([name,e.diverLabel,daypartLabel(e.daypart),entryModeLabel(e.entryMode),registrationTypeLabel(e.registrationType),toInputDT(e.start),toInputDT(e.ascentStart),toInputDT(e.surface),ascentCheckText({...e,dataset:name}),e.mdd,e.dtMin,e.dtSource||"",e.phaseTotalMin||"",calculationLabel(u),s,events.length>1?"":unitHg,events.length>1?"":fmtHF(u?.hf),events.length>1?"":u?.edt||"",mat.setNo,mat.maskNo,air,phaseSummary(e),(u?.messages||[]).join(" | "),resultTypeLabel(u),momentIndex+1,events.length,unitHg,aggregateRepeatFactor,aggregateStartFactor,effective??"",calculationDepth??""]);
       }
     }
@@ -5051,6 +5063,36 @@
     push("planning","Luchtindicatie 9 m: H 72 l/min x 1,9 ata = 137", "137", String(airUsePerMin(9)?.high), airUsePerMin(9)?.high===137);
     push("planning","Luchtindicatie aan oppervlak (0 m) = ademtempo zelf", "40/72", `${airUsePerMin(0)?.low}/${airUsePerMin(0)?.high}`, airUsePerMin(0)?.low===40 && airUsePerMin(0)?.high===72);
     push("planning","Meterregel-totaaltijden 6/9/12 m blijven 420/210/120", "420/210/120", `${shallowRules.s6.totalLimit}/${shallowRules.s9.totalLimit}/${shallowRules.s12.totalLimit}`, shallowRules.s6.totalLimit===420 && shallowRules.s9.totalLimit===210 && shallowRules.s12.totalLimit===120);
+    const meterBoundaryUnit = (depth,total) => {
+      const firstDt = Math.floor(total / 2);
+      return testState({live:[
+        chronoEv(`metergrens${depth}_${total}a`,"08:00:00","08:10:00",firstDt,depth,"1","auto"),
+        chronoEv(`metergrens${depth}_${total}b`,"08:24:00","08:34:00",total-firstDt,depth,"1","auto")
+      ]},()=>calcDataset("live").units[0]);
+    };
+    for(const vector of [
+      {depth:6, rule:"s6", limit:420, atHg:"J", overHg:"K"},
+      {depth:9, rule:"s9", limit:210, atHg:"J", overHg:"K"},
+      {depth:12,rule:"s12",limit:120, atHg:"H", overHg:"J"}
+    ]){
+      const atLimit = meterBoundaryUnit(vector.depth, vector.limit);
+      push("meterregel",`${vector.depth}-meterregel staat exact ${vector.limit} minuten toe`,
+        `${vector.rule}; 2 momenten; DT/EDT/NDL ${vector.limit}; HG ${vector.atHg}; geen blokkade`,
+        `${atLimit?.unitType}/${atLimit?.appliedRule}/${atLimit?.events?.length}/${atLimit?.dtTotal}/${atLimit?.edt}/${atLimit?.ndl}/${atLimit?.hgAdjusted}/${(atLimit?.codes||[]).join(",")||"geen"}`,
+        atLimit?.unitType==="meter" && atLimit?.appliedRule===vector.rule && atLimit?.events?.length===2 &&
+          atLimit?.dtTotal===vector.limit && atLimit?.hf===1 && atLimit?.incomingStartHf===1 &&
+          atLimit?.edt===vector.limit && atLimit?.ndl===vector.limit && atLimit?.hgAdjusted===vector.atHg &&
+          atLimit?.severity<2 && (atLimit?.codes||[]).length===0);
+      const overLimit = meterBoundaryUnit(vector.depth, vector.limit+1);
+      push("meterregel",`${vector.depth}-meterregel blokkeert ${vector.limit+1} minuten`,
+        `${vector.rule}; 2 momenten; DT/EDT ${vector.limit+1}; NDL ${vector.limit}; HG ${vector.overHg}; alleen BOTTOM_TIME_EXCEEDS_METER_RULE`,
+        `${overLimit?.unitType}/${overLimit?.appliedRule}/${overLimit?.events?.length}/${overLimit?.dtTotal}/${overLimit?.edt}/${overLimit?.ndl}/${overLimit?.hgAdjusted}/${(overLimit?.codes||[]).join(",")||"geen"}`,
+        overLimit?.unitType==="meter" && overLimit?.appliedRule===vector.rule && overLimit?.events?.length===2 &&
+          overLimit?.dtTotal===vector.limit+1 && overLimit?.hf===1 && overLimit?.incomingStartHf===1 &&
+          overLimit?.edt===vector.limit+1 && overLimit?.ndl===vector.limit && overLimit?.hgAdjusted===vector.overHg &&
+          overLimit?.severity===2 && (overLimit?.codes||[]).length===1 &&
+          overLimit.codes[0]==="BOTTOM_TIME_EXCEEDS_METER_RULE");
+    }
     const dayparts = testState({planning:[ev("D1","09:00:00",10,6,"1"),ev("D1","14:00:00",10,6,"2")]},()=>calcDataset("planning").units);
     push("dagdeel","Dagdeel 1 en 2 splitsen een chronologische meterregelsessie niet", "1 unit met DD1 en DD2", `${dayparts?.length} unit(s), ${unitDayparts(dayparts?.[0]).join("+")}`, dayparts?.length===1 && dayparts[0]?.unitType==="meter" && unitDayparts(dayparts[0]).join("")==="12");
     const dpCodes = testState({}, ()=>{ ensureProjectMeta(); return state.project.dayparts["1"].codes.length; });
@@ -5209,6 +5251,30 @@
       chronoEv("cm2","08:34:00","08:44:00",10,9)
     ]},()=>calcDataset("live").units[0]);
     push("buiten bereik","Gecombineerde duik blokkeert bij ontbrekende overeenkomstige tabelwaarde", "HG B naar 9 m ontbreekt; EMPTY_TABLE_CELL", `${comboMissing?.combinedSteps?.[0]?.hg}/${(comboMissing?.codes||[]).join(",")}`, comboMissing?.unitType==="combined" && comboMissing?.combinedSteps?.[0]?.hg==="B" && comboMissing?.severity===2 && (comboMissing?.codes||[]).includes("EMPTY_TABLE_CELL") && comboMissing?.combinedEffectiveTimeMin==null);
+    const comboMissingRegistration = registrationCalculationUnits({units:[comboMissing]})[0];
+    push("export","Later geblokkeerde gecombineerde duik bewaart bekende inkomende start-HF",
+      "start-HF 1,0 in unit, UI en registratie; geldige uitkomst-HF blijft null",
+      `${comboMissing?.incomingStartHf}/${comboMissing?.hf}/${unitFactorLabel(comboMissing)}/${comboMissingRegistration?.inkomendeStartHf}/${comboMissing?.severity}`,
+      comboMissing?.incomingStartHf===1 && comboMissing?.hf===null && unitFactorLabel(comboMissing)==="start-HF 1,0" &&
+        comboMissingRegistration?.inkomendeStartHf===1 && comboMissing?.severity===2);
+
+    const unknownCombinedStart = testState({live:[
+      chronoEv("ucs0","07:00:00","07:30:00",30,16,"1","normal"),
+      chronoEv("ucs1","08:30:00","08:40:00",10,9,"1","normal"),
+      chronoEv("ucs2","08:54:00","09:04:00",10,9,"1","normal")
+    ]},()=>{
+      const calc = calcDataset("live");
+      const unit = calc.units.find(u=>(u.events||[]).some(e=>e.id==="ucs1"));
+      const registration = registrationCalculationUnits({units:[unit]})[0];
+      return {unit, registration};
+    });
+    push("export","Werkelijk onbekende inkomende start-HF blijft onbekend",
+      "combined BLOCKED; incomingStartHf/HF/registratie null; UI -",
+      `${unknownCombinedStart?.unit?.unitType}/${unknownCombinedStart?.unit?.incomingStartHf}/${unknownCombinedStart?.unit?.hf}/${unitFactorLabel(unknownCombinedStart?.unit)}/${unknownCombinedStart?.registration?.inkomendeStartHf}`,
+      unknownCombinedStart?.unit?.unitType==="combined" && !!unknownCombinedStart?.unit?.chainBlockedBy &&
+        unknownCombinedStart?.unit?.incomingStartHf===null && unknownCombinedStart?.unit?.hf===null &&
+        unitFactorLabel(unknownCombinedStart?.unit)==="-" && unknownCombinedStart?.registration?.inkomendeStartHf===null &&
+        unknownCombinedStart?.unit?.severity===2);
 
     const comboDeco = testState({live:[
       chronoEv("cdeco1","08:00:00","08:20:00",200,9),
@@ -5287,6 +5353,12 @@
       chronoEv("mz0b","10:14:00","10:24:00",10,9,"1","auto")
     ]},()=>calcDataset("live").units[0]);
     push("meterregel","Meterregelsessie accepteert geen afzonderlijk duikmoment met DT 0", "s9-unit BLOCKED met INVALID_INPUT en zonder HG", `${meterZeroDt?.unitType}/${meterZeroDt?.appliedRule}/${(meterZeroDt?.codes||[]).join(",")}/${meterZeroDt?.hgRaw}`, meterZeroDt?.unitType==="meter" && meterZeroDt?.appliedRule==="s9" && meterZeroDt?.severity===2 && (meterZeroDt?.codes||[]).includes("INVALID_INPUT") && meterZeroDt?.hgRaw==null);
+    const meterZeroRegistration = registrationCalculationUnits({units:[meterZeroDt]})[0];
+    push("export","Geblokkeerde meterregelsessie bewaart bekende inkomende start-HF zonder geldige uitkomst-HF",
+      "start-HF 1,0 in unit, UI en registratie; uitkomst-HF null; BLOCKED",
+      `${meterZeroDt?.incomingStartHf}/${meterZeroDt?.hf}/${unitFactorLabel(meterZeroDt)}/${meterZeroRegistration?.inkomendeStartHf}/${meterZeroDt?.severity}`,
+      meterZeroDt?.incomingStartHf===1 && meterZeroDt?.hf===null && unitFactorLabel(meterZeroDt)==="start-HF 1,0" &&
+        meterZeroRegistration?.inkomendeStartHf===1 && meterZeroDt?.severity===2);
 
     const meterEscalate69 = testState({live:[
       chronoEv("me69a","11:00:00","11:10:00",10,6,"1","auto"),
@@ -5334,6 +5406,46 @@
     ]},()=>calcDataset("live").units);
     const resetMeter = meterResetAfterBlock.find(u=>u.unitType==="meter");
     push("meterregel","Ketenreset vóór routekeuze laat na geblokkeerde duik en OI >18 uur een nieuwe meterregelsessie starten", "eerste BLOCKED; daarna s9 met 2 momenten en HF 1,0", `${meterResetAfterBlock?.[0]?.severity}/${resetMeter?.appliedRule}/${resetMeter?.events?.length}/${fmtHF(resetMeter?.hf)}`, meterResetAfterBlock?.[0]?.severity===2 && resetMeter?.appliedRule==="s9" && resetMeter?.events?.length===2 && resetMeter?.hf===1);
+
+    const meterCollectorReset1080 = testState({live:[
+      chronoEv("mcr1080a","2026-05-23T07:00:00","2026-05-23T08:10:00",70,12,"1","auto"),
+      chronoEv("mcr1080b","2026-05-23T08:24:00","2026-05-23T09:54:00",90,12,"1","auto"),
+      chronoEv("mcr1080c","2026-05-24T03:54:00","2026-05-24T04:04:00",10,12,"1","auto"),
+      chronoEv("mcr1080d","2026-05-24T04:18:00","2026-05-24T04:28:00",10,12,"1","auto")
+    ]},()=>calcDataset("live").units);
+    push("meterregel","Metercollector behandelt OI exact 1080 minuten niet als >18-uursreset",
+      "1 s12-unit met 4 momenten en DT 180; bestaande blokkade blijft",
+      `${meterCollectorReset1080?.length}/${meterCollectorReset1080?.[0]?.appliedRule}/${meterCollectorReset1080?.[0]?.events?.length}/${meterCollectorReset1080?.[0]?.dtTotal}/${(meterCollectorReset1080?.[0]?.codes||[]).join(",")}`,
+      meterCollectorReset1080?.length===1 && meterCollectorReset1080[0]?.unitType==="meter" &&
+        meterCollectorReset1080[0]?.appliedRule==="s12" && meterCollectorReset1080[0]?.events?.length===4 &&
+        meterCollectorReset1080[0]?.dtTotal===180 && meterCollectorReset1080[0]?.severity===2 &&
+        (meterCollectorReset1080[0]?.codes||[]).length===2 &&
+        meterCollectorReset1080[0].codes.includes("BOTTOM_TIME_EXCEEDS_METER_RULE") &&
+        meterCollectorReset1080[0].codes.includes("BOTTOM_TIME_EXCEEDS_TABLE"));
+
+    const meterCollectorReset1081 = testState({live:[
+      chronoEv("mcr1081a","2026-05-23T07:00:00","2026-05-23T08:10:00",70,12,"1","auto"),
+      chronoEv("mcr1081b","2026-05-23T08:24:00","2026-05-23T09:54:00",90,12,"1","auto"),
+      chronoEv("mcr1081c","2026-05-24T03:55:00","2026-05-24T04:05:00",10,12,"1","auto"),
+      chronoEv("mcr1081d","2026-05-24T04:19:00","2026-05-24T04:29:00",10,12,"1","auto")
+    ]},()=>calcDataset("live").units);
+    const resetBlockedSession = meterCollectorReset1081[0];
+    const resetValidSession = meterCollectorReset1081[1];
+    push("meterregel","Metercollector start na OI 1081 minuten een nieuwe sessie ondanks ontbrekende voorlopige HG",
+      "eerste s12 BLOCKED op DT 160; tweede s12 geldig met start-HF 1,0, DT/EDT 20, HG A en zonder overgenomen codes",
+      `${meterCollectorReset1081?.length}/${resetBlockedSession?.appliedRule}/${resetBlockedSession?.events?.length}/${resetBlockedSession?.dtTotal}/${(resetBlockedSession?.codes||[]).join(",")}/${resetValidSession?.appliedRule}/${resetValidSession?.events?.length}/${resetValidSession?.incomingStartHf}/${resetValidSession?.dtTotal}/${resetValidSession?.edt}/${resetValidSession?.hgAdjusted}/${(resetValidSession?.codes||[]).join(",")||"geen"}`,
+      meterCollectorReset1081?.length===2 && resetBlockedSession?.unitType==="meter" &&
+        resetBlockedSession?.appliedRule==="s12" && resetBlockedSession?.events?.length===2 &&
+        resetBlockedSession?.dtTotal===160 && resetBlockedSession?.severity===2 &&
+        (resetBlockedSession?.codes||[]).length===2 &&
+        resetBlockedSession.codes.includes("BOTTOM_TIME_EXCEEDS_METER_RULE") &&
+        resetBlockedSession.codes.includes("BOTTOM_TIME_EXCEEDS_TABLE") &&
+        resetBlockedSession?.hgRaw==null && resetBlockedSession?.hgAdjusted==null &&
+        resetValidSession?.unitType==="meter" && resetValidSession?.appliedRule==="s12" &&
+        resetValidSession?.events?.length===2 && resetValidSession?.incomingStartHf===1 &&
+        resetValidSession?.hf===1 && resetValidSession?.dtTotal===20 && resetValidSession?.edt===20 &&
+        resetValidSession?.ndl===120 && resetValidSession?.hgRaw==="A" && resetValidSession?.hgAdjusted==="A" &&
+        resetValidSession?.severity<2 && (resetValidSession?.codes||[]).length===0 && !resetValidSession?.chainBlockedBy);
 
     const meterSessionSplit = testState({live:[
       chronoEv("msp1","08:00:00","08:10:00",10,9,"1","auto"),
@@ -6975,7 +7087,7 @@
         rekeneenheidMomenten:unitEvents.length,
         rekeneenheidHg:unitHg,
         rekeneenheidHf:(unit?.unitType === "combined" || unit?.unitType === "meter") ? "" : unit?.hf ?? "",
-        inkomendeStartHf:(unit?.unitType === "combined" || unit?.unitType === "meter") ? unit?.hf ?? "" : "",
+        inkomendeStartHf:(unit?.unitType === "combined" || unit?.unitType === "meter") ? unit?.incomingStartHf ?? "" : "",
         effectieveDuiktijd:unitEffectiveTime ?? "",
         berekeningTabeldiepte:unitCalculationDepth ?? "",
         status:s.txt,

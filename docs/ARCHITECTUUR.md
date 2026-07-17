@@ -51,7 +51,9 @@ wordt uitsluitend de overeenkomstige duiktijd voor de voorgaande HG uit
 Airtabel 1 gebruikt. Er wordt niet geïnterpoleerd. Een ontbrekende cel, een
 vierde gekoppeld moment, een start met inkomende HF anders dan 1,0 of een
 gezamenlijke uitkomst buiten de no-deco-envelop blokkeert de berekening. De
-functie leidt nooit een decompressieschema af.
+functie leidt nooit een decompressieschema af. De eenmaal bepaalde inkomende
+start-HF wordt als afzonderlijk auditveld bewaard en maakt een later
+geblokkeerde uitkomst niet alsnog geldig.
 
 ### `buildUnits` en `calcDataset`
 
@@ -83,7 +85,12 @@ naar 6, 9 of 12 meter op basis van de diepste werkelijke MDD. Wanneer de
 inkomende HF bij een later moment opnieuw exact 1,0 is, eindigt de bestaande
 sessie en kan een nieuwe sessie beginnen. Een afgewezen sessiestart krijgt geen
 kunstmatige HF 1,0 en valt niet stilzwijgend terug op een cumulatieve
-meterregeluitkomst.
+meterregeluitkomst. De collector controleert daarnaast vóór iedere
+voorlopige HG/HF-opzoeking de werkelijke chronologische afstand. De
+rechtstreekse tijdreset splitst alleen bij meer dan 1080 minuten; exact 1080
+minuten blijft in de tabelroute en kan nog splitsen wanneer de afgeleide HF
+exact 1,0 is. Daardoor werkt de 18-uursreset ook wanneer de voorlopige
+gezamenlijke HG niet berekenbaar is.
 
 ### `repeatProjection`
 
@@ -103,7 +110,8 @@ Compatibiliteitsreparatie voor oude live-records zonder timestamp. Sinds de time
 - XLSX gebruikt `inlineStr` en XML-escaping, zodat formuleachtige invoer als tekst wordt opgeslagen.
 - De registratie-JSON en -XLSX scheiden feitelijke duikmomenten van de
   gezamenlijke rekeneenheid. Een gecombineerde effectieve DT/HG wordt niet op
-  ieder fysiek moment geplakt.
+  ieder fysiek moment geplakt. De inkomende start-HF is een afzonderlijk
+  auditveld en blijft zichtbaar bij een latere blokkade; onbekend blijft leeg.
 - JSON-back-up bevat state-data en is bedoeld als lokale overdracht/back-up.
 
 ## 4. Tabelwaarden en diep bevroren bron

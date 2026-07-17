@@ -130,7 +130,15 @@ vierde gekoppeld moment, een start die al een herhalingsfactor anders dan 1,0
 heeft, een ontbrekende overeenkomstige tabelcel of een gezamenlijke effectieve
 tijd buiten de no-deco-envelop. Er wordt in die gevallen geen HG doorgegeven en
 geen decompressieschema afgeleid. Na meer dan 18 uur wordt een oude blokkade
-vóór de keuze van een nieuwe rekeneenheid gereset.
+vóór de keuze van een nieuwe rekeneenheid gereset. Die grens wordt ook binnen
+de meterregelcollector rechtstreeks op de chronologische OI bewaakt: 1080
+minuten blijft binnen de bestaande route, 1081 minuten start een nieuwe
+rekenreeks, ook als de voorlopige HG van de oude sessie ontbreekt.
+
+De inkomende start-HF wordt los van de geldige uitkomst-HF vastgelegd. Een
+bekende waarde blijft daardoor in scherm en registratie-uitvoer controleerbaar
+wanneer de rekeneenheid later blokkeert; een onbekende waarde blijft `null` of
+`-` en wordt niet kunstmatig op 1,0 gezet.
 
 ### Bron en besluitvorming
 
@@ -145,10 +153,12 @@ vóór de keuze van een nieuwe rekeneenheid gereset.
 | OSOD v0.1 exporteert geen gecombineerde rekeneenheid | Compatibiliteitsbesluit/open punt | OSOD kan losse feiten plus één gezamenlijke uitkomst niet betekenisbehoudend dragen; export blokkeert met `UNSUPPORTED_COMBINED_DIVE` vóór UUID/opslag/download |
 
 De vaste DCIEM-tabelwaarden, de bronfixture, de Tabel 4a-fixture en de
-rekenbronfingerprint zijn bij deze wijziging niet aangepast. De 498 ingebouwde
+rekenbronfingerprint zijn bij deze wijziging niet aangepast. De 509 ingebouwde
 zelftests dekken onder meer OI 14/15/16, twee en drie momenten, gelijke en
 verschillende diepten, lege cellen, no-deco-overschrijding, dagdeelwisseling,
-meterregelsessies, sessiesplitsing, 18-uursreset, overlap en de OSOD-blokkade.
+meterregelsessies, sessiesplitsing, de 18-uursgrens 1080/1081, functionele
+meterregelgrenzen 420/421, 210/211 en 120/121, auditwaarden bij blokkades,
+overlap en de OSOD-blokkade.
 
 ## Aanscherping v1.27.0: EDT in exacte tienden
 

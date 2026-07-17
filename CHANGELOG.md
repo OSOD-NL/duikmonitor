@@ -13,7 +13,9 @@ Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
 - Geldige 6-, 9- en 12-meterregelsessies hebben voorrang, mogen alleen met
   inkomende HF 1,0 starten, gebruiken de diepste werkelijke MDD voor de regel
   en lopen over een dagdeelwisseling heen. Wanneer de inkomende HF later weer
-  exact 1,0 is, begint een nieuwe sessie.
+  exact 1,0 is, begint een nieuwe sessie. Een chronologische onderbreking van
+  meer dan 18 uur splitst de sessie ook wanneer de voorlopige HG niet meer
+  berekenbaar is; exact 18 uur activeert deze reset niet.
 - Buiten een geldige meterregelsessie worden twee of drie opeenvolgende
   duikmomenten met een oppervlakte-interval korter dan 15 minuten als één
   gecombineerde duik berekend. Bij gelijke tabeldiepte telt de effectieve tijd
@@ -32,7 +34,9 @@ Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
   herhalingsduik, gecombineerde duik en meterregelsessie. Fysieke tijden, MDD's
   en DT's blijven per moment zichtbaar; gezamenlijke effectieve DT,
   tabeldiepte en HG staan alleen bij de rekeneenheid. `start-HF` is zichtbaar
-  onderscheiden van de gewone herhalingsfactor.
+  onderscheiden van de gewone herhalingsfactor. Een eenmaal bepaalde
+  inkomende start-HF blijft als auditgegeven zichtbaar wanneer de
+  rekeneenheid later blokkeert; een werkelijk onbekende waarde blijft leeg.
 - Registratie-JSON bevat naast de fysieke registratieregels een aparte
   `berekeningen`-laag met leden, rekenregel, fysieke som, overeenkomstige
   duiktijden, effectieve uitkomst en blokkades. Registratie-XLSX maakt dezelfde
@@ -53,11 +57,13 @@ Alle noemenswaardige wijzigingen aan de Duikmonitor worden hier bijgehouden.
   beginnen. De chronologische reducer, het maximum van drie automatisch
   gecombineerde momenten en blokkeren zonder interpolatie of decompressieroute
   zijn expliciete, conservatieve projectbesluiten en broninterpretaties.
-- De ingebouwde zelftest is uitgebreid van 470 naar 498 controles. Toegevoegd
+- De ingebouwde zelftest is uitgebreid van 470 naar 509 controles. Toegevoegd
   zijn onder meer OI 14/15/16, twee en drie momenten op gelijke en verschillende
   diepten, lege cellen, gezamenlijke no-deco-overschrijding, overlap, DT 0,
-  dagdeelwisseling, meterregelvoorrang en -splitsing, 18-uursreset,
-  chronologische invoervolgorde en JSON/XLSX/OSOD-uitvoer.
+  dagdeelwisseling, meterregelvoorrang en -splitsing, de 18-uursgrens op
+  1080/1081 minuten, onafhankelijke meterregelgrenzen 420/421, 210/211 en
+  120/121, auditwaarden bij geblokkeerde rekeneenheden, chronologische
+  invoervolgorde en JSON/XLSX/OSOD-uitvoer.
 - Appversielabel verhoogd naar v1.30.0.
 
 ### Niet gewijzigd
