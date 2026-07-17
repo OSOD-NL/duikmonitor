@@ -1200,6 +1200,9 @@
   let dashboardDataset = "planning";
   let reportDataset = "planning";
   let selftestMode = "all";
+  let selftestStorageOverlay = null;
+  let selftestRunActive = false;
+  let selftestRenderActive = false;
   let pendingStartBars = {};
   // Vluchtige markering per duiker of de diepte (MDD) voor de eerstvolgende start bewust is
   // bevestigd of bewust is gezet. Net als pendingStartBars staat dit bewust niet in de
@@ -1512,11 +1515,39 @@
     return repaired;
   }
 
+  function appStorageGetItem(key){
+    if(selftestStorageOverlay) return selftestStorageOverlay.has(key) ? selftestStorageOverlay.get(key) : null;
+    return localStorage.getItem(key);
+  }
+  function appStorageSetItem(key, value){
+    if(selftestStorageOverlay){ selftestStorageOverlay.set(key, String(value)); return; }
+    localStorage.setItem(key, value);
+  }
+  function appStorageRemoveItem(key){
+    if(selftestStorageOverlay){ selftestStorageOverlay.delete(key); return; }
+    localStorage.removeItem(key);
+  }
+  function appStorageSnapshot(getItem=appStorageGetItem){
+    const snapshot = new Map();
+    for(const key of [STORAGE_KEY,...LEGACY_STORAGE_KEYS]){
+      const value = getItem(key);
+      if(value !== null) snapshot.set(key, value);
+    }
+    return snapshot;
+  }
+  function storageSnapshotSignature(snapshot){
+    return snapshot == null ? null : JSON.stringify(Array.from(snapshot.entries()));
+  }
+  function realAppStorageSnapshot(){
+    try{ return appStorageSnapshot(key=>localStorage.getItem(key)); }
+    catch(e){ return null; }
+  }
+
   function load(){
     try{
-      let raw = localStorage.getItem(STORAGE_KEY);
+      let raw = appStorageGetItem(STORAGE_KEY);
       if(!raw){
-        for(const key of LEGACY_STORAGE_KEYS){ raw = localStorage.getItem(key); if(raw) break; }
+        for(const key of LEGACY_STORAGE_KEYS){ raw = appStorageGetItem(key); if(raw) break; }
       }
       const def = defaultState();
       if(raw){
@@ -1532,13 +1563,13 @@
       ensureProjectMeta();
       ensureDivers();
       migrateDiveRows();
-      if(repairActiveLiveTimerDates()) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if(repairActiveLiveTimerDates()) appStorageSetItem(STORAGE_KEY, JSON.stringify(state));
     }catch(e){ console.warn(e); state = defaultState(); }
   }
   function save(){
     const el = document.getElementById("saveState");
     try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      appStorageSetItem(STORAGE_KEY, JSON.stringify(state));
       if(el){ el.classList.remove("bad"); el.classList.add("local"); el.textContent = "Opgeslagen"; setTimeout(()=>{ el.textContent = "Lokaal opgeslagen"; }, 1200); }
     }catch(err){
       // Opslag kan vol zijn of door browserbeleid geblokkeerd. Niet stilzwijgend doen
@@ -3605,7 +3636,95 @@
     const payload = built.length === 1 ? built[0].record : built.map(b=>b.record);
     downloadBlob(new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"}), `duikmonitor-osod-${state.project.date || "export"}.json`);
   }
+  function withSelfTestIsolation(fn){
+    const saved = {
+      state,
+      currentScreen,
+      dashboardDataset,
+      reportDataset,
+      selftestMode,
+      pendingStartBars,
+      depthConfirmed,
+      confirmDepthFn,
+      confirmSurfaceFn,
+      pendingAirInputs,
+      pendingAirDepthInputs,
+      pendingEndBars,
+      openDiverNotes,
+      openDetailKeys,
+      airAudioCtx,
+      bootGate,
+      airSoundPrimed,
+      airSoundLastKeys,
+      veiligheidsregioAndersOpen,
+      storageOverlay:selftestStorageOverlay
+    };
+    try{
+      try{ selftestStorageOverlay = appStorageSnapshot(); }
+      catch(e){ selftestStorageOverlay = new Map(); }
+      state = defaultState();
+      pendingStartBars = {};
+      depthConfirmed = {};
+      pendingAirInputs = {};
+      pendingAirDepthInputs = {};
+      pendingEndBars = {};
+      openDiverNotes = {};
+      openDetailKeys = {};
+      airAudioCtx = null;
+      airSoundPrimed = false;
+      airSoundLastKeys = {};
+      veiligheidsregioAndersOpen = false;
+      return fn();
+    } finally {
+      state = saved.state;
+      currentScreen = saved.currentScreen;
+      dashboardDataset = saved.dashboardDataset;
+      reportDataset = saved.reportDataset;
+      selftestMode = saved.selftestMode;
+      pendingStartBars = saved.pendingStartBars;
+      depthConfirmed = saved.depthConfirmed;
+      confirmDepthFn = saved.confirmDepthFn;
+      confirmSurfaceFn = saved.confirmSurfaceFn;
+      pendingAirInputs = saved.pendingAirInputs;
+      pendingAirDepthInputs = saved.pendingAirDepthInputs;
+      pendingEndBars = saved.pendingEndBars;
+      openDiverNotes = saved.openDiverNotes;
+      openDetailKeys = saved.openDetailKeys;
+      airAudioCtx = saved.airAudioCtx;
+      bootGate = saved.bootGate;
+      airSoundPrimed = saved.airSoundPrimed;
+      airSoundLastKeys = saved.airSoundLastKeys;
+      veiligheidsregioAndersOpen = saved.veiligheidsregioAndersOpen;
+      selftestStorageOverlay = saved.storageOverlay;
+    }
+  }
+
   function runSelfTests(mode="all"){
+    if(selftestRunActive) throw new Error("Zelftest is al actief.");
+    selftestRunActive = true;
+    try{
+      const realStorageBefore = realAppStorageSnapshot();
+      const tests = withSelfTestIsolation(()=>runSelfTestsCore(mode));
+      const realStorageAfter = realAppStorageSnapshot();
+      if(mode === "all" || mode === "invariant"){
+        const beforeSig = storageSnapshotSignature(realStorageBefore);
+        const afterSig = storageSnapshotSignature(realStorageAfter);
+        const measurable = beforeSig !== null && afterSig !== null;
+        tests.push({
+          category:"invariant",
+          name:"Zelftests laten de echte app-opslag exact ongewijzigd",
+          expected:"dezelfde opgeslagen sleutels en bytes voor en na",
+          actual:measurable ? (beforeSig === afterSig ? "exact gelijk" : "afwijkend") : "opslag niet uitleesbaar; sandbox actief",
+          ok:!measurable || beforeSig === afterSig
+        });
+      }
+      return tests;
+    } finally {
+      selftestRunActive = false;
+    }
+  }
+
+  function runSelfTestsCore(mode="all"){
     const tests=[];
     const push=(category,name,expected,actual,ok)=>tests.push({category,name,expected:String(expected),actual:String(actual),ok:!!ok});
     const testState = (custom, fn) => {
@@ -3631,6 +3750,43 @@
       finally{ state = old; for(const s of snaps) restoreBuffer(s); }
       return result;
     };
+    (function(){
+      const stateRef = state;
+      const stateBefore = JSON.stringify(state);
+      const bufferRefs = [pendingStartBars, depthConfirmed, pendingEndBars, pendingAirInputs, pendingAirDepthInputs];
+      const buffersBefore = JSON.stringify(bufferRefs);
+      const overlayRef = selftestStorageOverlay;
+      const overlayBefore = storageSnapshotSignature(overlayRef);
+      let exceptionCaught = false;
+      try{
+        withSelfTestIsolation(()=>{
+          state.project.location = "zelftest-isolatieproef";
+          pendingStartBars.D1 = "250";
+          depthConfirmed.D1 = true;
+          pendingEndBars.D1 = "120";
+          pendingAirInputs.D1 = "200";
+          pendingAirDepthInputs.D1 = "9";
+          appStorageSetItem(STORAGE_KEY, '{"zelftest":"isolatieproef"}');
+          throw new Error("verwachte zelftest-isolatie-exception");
+        });
+      }catch(e){
+        exceptionCaught = e && e.message === "verwachte zelftest-isolatie-exception";
+      }
+      const refsRestored = state === stateRef
+        && bufferRefs[0] === pendingStartBars
+        && bufferRefs[1] === depthConfirmed
+        && bufferRefs[2] === pendingEndBars
+        && bufferRefs[3] === pendingAirInputs
+        && bufferRefs[4] === pendingAirDepthInputs
+        && overlayRef === selftestStorageOverlay;
+      const contentsRestored = JSON.stringify(state) === stateBefore
+        && JSON.stringify(bufferRefs) === buffersBefore
+        && storageSnapshotSignature(selftestStorageOverlay) === overlayBefore;
+      push("invariant","Zelftest-sandbox herstelt state, sessiebuffers en opslagcontext na een exception",
+        "exception gevangen; bindings en inhoud exact hersteld",
+        `exception=${exceptionCaught}; bindings=${refsRestored}; inhoud=${contentsRestored}`,
+        exceptionCaught && refsRestored && contentsRestored);
+    })();
     const today = "2026-05-23";
     const ev = (diverId,start,dtMin,mdd,daypart="1",rule="auto") => ({id:uid(),diverId,start:`${today}T${start}`,dtMin,mdd,daypart,rule,notes:"zelftest"});
     push("basis","Appversielabel", "v1.29.0", APP_VERSION, APP_VERSION==="v1.29.0");
@@ -6219,20 +6375,26 @@
   }
 
   function renderSelftest(){
-    const categories = [["all","Alle zelftests"],["verificatie","Boot-gate verificatie"],["basis","Basistabellen"],["osod","OSOD-conformiteit"],["invariant","Rekeninvarianten"],["live","Live registratie"],["herhaling","Herhalingsduik-vooruitblik"],["meterregel","Meterregels"],["dagdeel","Dagdelen en duikers"],["grens","Grenssituaties"],["buiten bereik","Buiten bereik"],["bediening","Bediening"],["lucht","Ademlucht"],["registratie","Registratie"],["export","Export"],["thema","Schermthema"],["achteraf","Achteraf invoeren"],["fasen","Fasen / rolmomenten"],["voorbeeld","Voorbeeldscenario's"],["privacy","Privacy"]];
-    const tests = runSelfTests(selftestMode);
-    const okCount = tests.filter(t=>t.ok).length;
-    const rows = tests.map(t=>`<tr><td>${esc(t.category)}</td><td>${esc(t.name)}</td><td>${esc(t.expected)}</td><td>${esc(t.actual)}</td><td><span class="pill ${t.ok?'ok':'bad'}">${t.ok?'OK':'FOUT'}</span></td></tr>`).join("");
-    document.getElementById("selftestScreen").innerHTML = `<div class="grid">
-      <div class="card span12"><h2>Zelftest</h2><p class="note">Deze zelftest controleert de rekenmotor en bediening met vaste scenario's. De test schrijft niets weg in je echte planning of dagregistratie.</p><p class="small mono" style="word-break:break-all">Rekenbron Niveau R: ${esc(OSOD_TABLE_SOURCE_ID)} (DCIEM Airtabel 1, IWOD 002 par. 2300) · sha256-rekenbronfingerprint: ${esc(osodTableFingerprintSha256())}</p><div class="fieldrow"><div class="f4"><label>Testgroep</label><select aria-label="Testgroep" class="user" id="selftestMode">${categories.map(([v,l])=>`<option value="${esc(v)}" ${selftestMode===v?'selected':''}>${esc(l)}</option>`).join("")}</select></div><div class="f8"><label>Status</label><div class="statusline"><span class="pill ${okCount===tests.length?'ok':'bad'}">${okCount}/${tests.length} OK</span><button class="ghost no-print" id="rerunSelftest">Opnieuw uitvoeren</button></div></div></div></div>
-      <div class="card span12"><div class="tablewrap"><table class="table"><thead><tr><th>Groep</th><th>Test</th><th>Verwacht</th><th>Werkelijk</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></div>
-    </div>`;
-    document.getElementById("selftestMode").onchange=e=>{selftestMode=e.target.value;render();};
-    document.getElementById("rerunSelftest").onclick=()=>render();
+    if(selftestRenderActive || selftestRunActive) return;
+    selftestRenderActive = true;
+    try{
+      const categories = [["all","Alle zelftests"],["verificatie","Boot-gate verificatie"],["basis","Basistabellen"],["osod","OSOD-conformiteit"],["invariant","Rekeninvarianten"],["live","Live registratie"],["herhaling","Herhalingsduik-vooruitblik"],["meterregel","Meterregels"],["dagdeel","Dagdelen en duikers"],["grens","Grenssituaties"],["buiten bereik","Buiten bereik"],["bediening","Bediening"],["lucht","Ademlucht"],["registratie","Registratie"],["export","Export"],["thema","Schermthema"],["achteraf","Achteraf invoeren"],["fasen","Fasen / rolmomenten"],["voorbeeld","Voorbeeldscenario's"],["privacy","Privacy"]];
+      const tests = runSelfTests(selftestMode);
+      const okCount = tests.filter(t=>t.ok).length;
+      const rows = tests.map(t=>`<tr><td>${esc(t.category)}</td><td>${esc(t.name)}</td><td>${esc(t.expected)}</td><td>${esc(t.actual)}</td><td><span class="pill ${t.ok?'ok':'bad'}">${t.ok?'OK':'FOUT'}</span></td></tr>`).join("");
+      document.getElementById("selftestScreen").innerHTML = `<div class="grid">
+        <div class="card span12"><h2>Zelftest</h2><p class="note">Deze zelftest controleert de rekenmotor en bediening met vaste scenario's. De test schrijft niets weg in je echte planning of dagregistratie.</p><p class="small mono" style="word-break:break-all">Rekenbron Niveau R: ${esc(OSOD_TABLE_SOURCE_ID)} (DCIEM Airtabel 1, IWOD 002 par. 2300) · sha256-rekenbronfingerprint: ${esc(osodTableFingerprintSha256())}</p><div class="fieldrow"><div class="f4"><label>Testgroep</label><select aria-label="Testgroep" class="user" id="selftestMode">${categories.map(([v,l])=>`<option value="${esc(v)}" ${selftestMode===v?'selected':''}>${esc(l)}</option>`).join("")}</select></div><div class="f8"><label>Status</label><div class="statusline"><span class="pill ${okCount===tests.length?'ok':'bad'}">${okCount}/${tests.length} OK</span><button class="ghost no-print" id="rerunSelftest">Opnieuw uitvoeren</button></div></div></div></div>
+        <div class="card span12"><div class="tablewrap"><table class="table"><thead><tr><th>Groep</th><th>Test</th><th>Verwacht</th><th>Werkelijk</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+      </div>`;
+      document.getElementById("selftestMode").onchange=e=>{selftestMode=e.target.value;render();};
+      document.getElementById("rerunSelftest").onclick=()=>render();
+    } finally {
+      selftestRenderActive = false;
+    }
   }
 
   function resetAllData(){
-    try{ [STORAGE_KEY,...LEGACY_STORAGE_KEYS].forEach(k=>localStorage.removeItem(k)); }catch(e){ console.warn(e); }
+    try{ [STORAGE_KEY,...LEGACY_STORAGE_KEYS].forEach(k=>appStorageRemoveItem(k)); }catch(e){ console.warn(e); }
     state = defaultState();
     depthConfirmed = {};
     // Na een wis hoort de app in een volledig schone begintoestand te staan: een
